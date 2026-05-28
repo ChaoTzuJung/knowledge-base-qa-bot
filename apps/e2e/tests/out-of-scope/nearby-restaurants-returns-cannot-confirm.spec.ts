@@ -16,7 +16,9 @@ test.describe("Out-of-scope fallback", () => {
     await page.keyboard.press("Enter");
 
     // expect: a user message bubble "Which restaurants are nearby?" appears
-    await expect(page.getByText("Which restaurants are nearby?")).toBeVisible();
+    await expect(
+      page.getByTestId("user-message").filter({ hasText: "Which restaurants are nearby?" }),
+    ).toBeVisible();
 
     // 3. Wait for the assistant response to finish (allow up to 30s)
     // expect: the assistant message text equals exactly "I cannot confirm from the knowledge base."

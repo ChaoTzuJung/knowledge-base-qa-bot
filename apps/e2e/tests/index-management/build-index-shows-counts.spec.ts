@@ -8,8 +8,8 @@ test.describe("Index management", () => {
     const button = page.getByRole("button", { name: /Build Index|Indexing/ });
     await expect(button).toBeVisible();
 
-    // 1. Slow the /index request so the "Indexing…" in-flight label is observable.
-    await page.route("**/index", async (route) => {
+    // 1. Slow the /build-index request so the "Indexing…" in-flight label is observable.
+    await page.route("**/build-index", async (route) => {
       await new Promise((r) => setTimeout(r, 500));
       await route.continue();
     });

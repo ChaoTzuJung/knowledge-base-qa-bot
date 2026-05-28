@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { AssistantRuntimeProvider, Thread } from "@assistant-ui/react";
+import { AssistantRuntimeProvider } from "@assistant-ui/react";
+import { Thread } from "@/components/Thread";
 import { StrategyPicker } from "@/components/StrategyPicker";
 import { IndexButton } from "@/components/IndexButton";
 import { SourcesPanel } from "@/components/SourcesPanel";
@@ -9,13 +10,6 @@ import type { Strategy } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Mode = "chat" | "compare";
-
-const WELCOME_SUGGESTIONS = [
-  "How long do refunds take?",
-  "Can I change my email address?",
-  "How fast is expedited shipping?",
-  "Which restaurants are nearby?",
-];
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("chat");
@@ -52,12 +46,7 @@ export default function App() {
         <AssistantRuntimeProvider runtime={runtime}>
           <div className="grid flex-1 grid-cols-[1fr_320px] overflow-hidden">
             <div className="flex h-full flex-col overflow-hidden">
-              <Thread
-                welcome={{
-                  message: "Ask me anything from the indexed knowledge base.",
-                  suggestions: WELCOME_SUGGESTIONS.map((s) => ({ prompt: s, text: s })),
-                }}
-              />
+              <Thread />
             </div>
             <aside className="overflow-y-auto border-l border-border bg-muted/20 p-4 space-y-4">
               <IndexButton />

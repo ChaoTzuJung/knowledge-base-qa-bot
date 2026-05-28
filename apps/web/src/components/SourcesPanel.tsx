@@ -1,31 +1,47 @@
-import { useThread } from "@assistant-ui/react";
+import { useAuiState } from "@assistant-ui/react";
 import type { SourceInfo, SourcesPayload, Strategy } from "@/lib/types";
 
 function isSourcesPayload(value: unknown): value is SourcesPayload {
   return (
     typeof value === "object" &&
     value !== null &&
-    (value as { type?: unknown }).type === "sources" &&
     Array.isArray((value as { sources?: unknown }).sources)
   );
 }
 
-function latestSources(messages: readonly { role: string; metadata?: { unstable_data?: readonly unknown[] } }[]) {
+interface MinimalPart {
+  type: string;
+  name?: string;
+  data?: unknown;
+}
+
+interface MinimalMessage {
+  role: string;
+  parts?: readonly MinimalPart[];
+}
+
+function latestSources(messages: readonly unknown[]): SourcesPayload | null {
   for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i];
-    if (m.role !== "assistant") continue;
-    const data = m.metadata?.unstable_data ?? [];
-    for (let j = data.length - 1; j >= 0; j--) {
-      const part = data[j];
-      if (isSourcesPayload(part)) return part;
+    const m = messages[i] as MinimalMessage | undefined;
+    if (!m || m.role !== "assistant") continue;
+    const parts = m.parts ?? [];
+    for (let j = parts.length - 1; j >= 0; j--) {
+      const part = parts[j];
+      if (
+        part?.type === "data" &&
+        part.name === "sources" &&
+        isSourcesPayload(part.data)
+      ) {
+        return part.data;
+      }
     }
   }
   return null;
 }
 
 export function SourcesPanel() {
-  const payload = useThread((s) =>
-    latestSources(s.messages as readonly { role: string; metadata?: { unstable_data?: readonly unknown[] } }[]),
+  const payload = useAuiState((s) =>
+    latestSources(s.thread.messages as readonly unknown[]),
   );
 
   const sources: SourceInfo[] = payload?.sources ?? [];
@@ -37,9 +53,7 @@ export function SourcesPanel() {
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Sources
         </div>
-        {strategy && (
-          <div className="text-xs text-muted-foreground">{strategy}</div>
-        )}
+        {strategy && <div className="text-xs text-muted-foreground">{strategy}</div>}
       </div>
       {sources.length === 0 ? (
         <div className="rounded-md border border-dashed border-border px-3 py-4 text-xs text-muted-foreground">

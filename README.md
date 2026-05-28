@@ -3,8 +3,21 @@
 Node.js + React port of [`build-moat-live-sessions/knowledge_base_qa_bot`](https://github.com/AllenLi0110/build-moat-live-sessions/tree/main/knowledge_base_qa_bot).
 Grounded Q&A over local Markdown docs. Both **Markdown KB (BM25)** and **Vector RAG (HNSW)**
 retrieval strategies are implemented, plus a `/compare` endpoint that runs both side-by-side.
-The frontend uses [assistant-ui](https://www.assistant-ui.com/) with the Vercel AI SDK data
-stream protocol — sources are streamed first as a data part, then answer tokens.
+The frontend uses [assistant-ui](https://www.assistant-ui.com/) v0.14 with the **Vercel AI SDK
+v6 UI message stream protocol** — sources are streamed first as a `data-sources` part, then
+answer tokens as `text-start` / `text-delta` / `text-end`.
+
+### Stack pin
+
+| Package | Version |
+|---|---|
+| `ai` | ^6.0.0 |
+| `@ai-sdk/openai` | ^3.0.0 |
+| `@ai-sdk/react` | ^3.0.0 |
+| `@assistant-ui/react` | ^0.14.0 |
+| `@assistant-ui/react-ai-sdk` | ^1.3.0 |
+| `hono` | ^4.6.0 |
+| `hnswlib-node` | ^3.0.0 |
 
 ## Layout
 
@@ -102,7 +115,13 @@ curl -X POST http://localhost:8000/chat \
 curl -N -X POST http://localhost:8000/chat/stream \
   -H 'Content-Type: application/json' \
   -d '{"query":"How long do refunds take?"}'
-# AI SDK data stream: first a `2:` data part with sources, then `0:` text deltas, then a `d:` finish part.
+# AI SDK v6 UI message stream (SSE):
+#   data: {"type":"data-sources", "id":"sources", "data":{"strategy":..., "sources":[...]}}
+#   data: {"type":"start","messageId":"..."}
+#   data: {"type":"text-start","id":"..."}
+#   data: {"type":"text-delta","id":"...","delta":"Refund"}
+#   ...
+#   data: {"type":"finish"}
 
 curl -X POST http://localhost:8000/compare \
   -H 'Content-Type: application/json' \
@@ -117,8 +136,8 @@ curl -X POST http://localhost:8000/compare \
 | Retrieval unit                            | Markdown KB: heading section. Vector RAG: same, but split if section > 1500 chars (200-char overlap).   |
 | Score threshold                           | BM25 ≥ 0.5; cosine similarity ≥ 0.3. Below threshold ⇒ honest "cannot confirm", no LLM call.            |
 | Persistence                               | `.kb/index.json` (Markdown KB) + `.kb/vector_index/{metadata.json,hnsw.bin}` (Vector RAG). Auto-loaded. |
-| Streaming                                 | Vercel AI SDK data stream from `streamText().mergeIntoDataStream()`. Sources via `writeData()`.         |
-| Frontend                                  | assistant-ui's prebuilt `<Thread />` consumes the data stream natively via `useChatRuntime`.            |
+| Streaming                                 | `createUIMessageStream` + `writer.write({type:"data-sources"})` + `writer.merge(streamText().toUIMessageStream())`. |
+| Frontend                                  | assistant-ui `<Thread />` composed from `ThreadPrimitive` / `MessagePrimitive` / `ComposerPrimitive`; data parts surface as `{type:"data", name:"sources", data}` in `message.parts`. |
 | Scale (10 → 100k files)                   | BM25 in-memory stops scaling well past ~10k sections; switch to a BM25 backend (Tantivy/Meili) or rely on Vector + ANN. |
 
 ## Scripts

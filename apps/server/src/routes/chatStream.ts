@@ -1,42 +1,66 @@
 import { openai } from "@ai-sdk/openai";
-import { createDataStreamResponse, formatDataStreamPart, streamText } from "ai";
+import {
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  streamText,
+  type UIMessageStreamWriter,
+} from "ai";
 import { Hono } from "hono";
 import { z } from "zod";
 import { OPENAI_MODEL } from "../env.js";
 import { SYSTEM_PROMPT } from "../llm/prompts.js";
 import { retrieve } from "../strategies/query.js";
 
-const Message = z.object({
+const MessagePart = z.object({ type: z.string() }).passthrough();
+
+const UIMessageSchema = z.object({
+  id: z.string().optional(),
   role: z.string(),
-  content: z.union([
-    z.string(),
-    z.array(z.object({ type: z.string(), text: z.string().optional() }).passthrough()),
-  ]),
+  parts: z.array(MessagePart).optional(),
+  content: z.union([z.string(), z.array(MessagePart)]).optional(),
 });
 
-const StreamBody = z.object({
-  query: z.string().optional(),
-  messages: z.array(Message).optional(),
-  strategy: z.enum(["markdown_kb", "vector_rag"]).optional(),
-}).refine((v) => v.query || (v.messages && v.messages.length > 0), {
-  message: "Provide either query or messages.",
-});
+const StreamBody = z
+  .object({
+    query: z.string().optional(),
+    messages: z.array(UIMessageSchema).optional(),
+    strategy: z.enum(["markdown_kb", "vector_rag"]).optional(),
+  })
+  .refine((v) => v.query || (v.messages && v.messages.length > 0), {
+    message: "Provide either query or messages.",
+  });
 
-function extractQuery(body: z.infer<typeof StreamBody>): string {
+type StreamBodyType = z.infer<typeof StreamBody>;
+type MessagePartType = z.infer<typeof MessagePart>;
+
+function partText(p: MessagePartType): string | null {
+  if (p.type !== "text") return null;
+  const text = (p as { text?: unknown }).text;
+  return typeof text === "string" ? text : null;
+}
+
+function extractQuery(body: StreamBodyType): string {
   if (body.query) return body.query;
   const msgs = body.messages ?? [];
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
     if (m.role !== "user") continue;
-    if (typeof m.content === "string") return m.content;
-    const textPart = m.content.find((p) => p.type === "text" && p.text);
-    if (textPart?.text) return textPart.text;
+    const candidates: MessagePartType[] = m.parts ?? (Array.isArray(m.content) ? m.content : []);
+    const texts = candidates.map(partText).filter((t): t is string => t !== null);
+    if (texts.length > 0) return texts.join(" ");
+    if (typeof m.content === "string" && m.content.length > 0) return m.content;
   }
   return "";
 }
 
+function writeText(writer: UIMessageStreamWriter, id: string, text: string) {
+  writer.write({ type: "text-start", id });
+  writer.write({ type: "text-delta", id, delta: text });
+  writer.write({ type: "text-end", id });
+}
+
 export const chatStreamRoute = new Hono().post("/chat/stream", async (c) => {
-  let body: z.infer<typeof StreamBody>;
+  let body: StreamBodyType;
   try {
     body = StreamBody.parse(await c.req.json());
   } catch {
@@ -49,41 +73,39 @@ export const chatStreamRoute = new Hono().post("/chat/stream", async (c) => {
 
   const retrieved = await retrieve(query, strategy);
 
-  const response = createDataStreamResponse({
-    async execute(dataStream) {
-      dataStream.writeData(
-        JSON.parse(JSON.stringify({
-          type: "sources",
+  const stream = createUIMessageStream({
+    execute: async ({ writer }) => {
+      writer.write({
+        type: "data-sources",
+        id: "sources",
+        data: {
           strategy,
           sources: retrieved.sources,
-        })),
-      );
+        },
+      });
 
       if (retrieved.notIndexed) {
         const which = strategy === "markdown_kb" ? "Markdown KB" : "Vector";
-        dataStream.write(
-          formatDataStreamPart(
-            "text",
-            `The ${which} index has not been built yet. Call POST /index first.`,
-          ),
+        writeText(
+          writer,
+          "fallback-text",
+          `The ${which} index has not been built yet. Call POST /index first.`,
         );
         return;
       }
 
       if (!retrieved.ok || !retrieved.prompt) {
-        dataStream.write(
-          formatDataStreamPart("text", "I cannot confirm from the knowledge base."),
-        );
+        writeText(writer, "fallback-text", "I cannot confirm from the knowledge base.");
         return;
       }
 
-      const stream = streamText({
+      const result = streamText({
         model: openai(OPENAI_MODEL),
         system: SYSTEM_PROMPT,
         prompt: retrieved.prompt,
         temperature: 0,
       });
-      stream.mergeIntoDataStream(dataStream);
+      writer.merge(result.toUIMessageStream());
     },
     onError: (err) => {
       console.error("[/chat/stream] error:", err);
@@ -91,5 +113,5 @@ export const chatStreamRoute = new Hono().post("/chat/stream", async (c) => {
     },
   });
 
-  return response;
+  return createUIMessageStreamResponse({ stream });
 });

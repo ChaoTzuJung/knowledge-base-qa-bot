@@ -1,0 +1,15 @@
+{
+  "name": "@kb/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "PLAYWRIGHT_HTML_OPEN=never playwright test",
+    "test:debug": "PLAYWRIGHT_HTML_OPEN=never playwright test --debug=cli",
+    "install-browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^22.9.0"
+  }
+}

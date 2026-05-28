@@ -1,13 +1,8 @@
 import type { Config } from "tailwindcss";
 import animate from "tailwindcss-animate";
-import assistantUiPlugin from "@assistant-ui/react/tailwindcss";
 
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{ts,tsx}",
-    "./node_modules/@assistant-ui/react/dist/**/*.{js,mjs}",
-  ],
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
@@ -48,5 +43,5 @@ export default {
       },
     },
   },
-  plugins: [animate, assistantUiPlugin({ components: ["thread"] })],
+  plugins: [animate],
 } satisfies Config;

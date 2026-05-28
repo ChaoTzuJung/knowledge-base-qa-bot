@@ -1,0 +1,26 @@
+{
+  "name": "@kb/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.0.0",
+    "@hono/node-server": "^1.13.0",
+    "ai": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "hnswlib-node": "^3.0.0",
+    "hono": "^4.6.0",
+    "openai": "^4.70.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

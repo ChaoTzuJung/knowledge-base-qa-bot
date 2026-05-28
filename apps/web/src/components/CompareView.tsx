@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { compareQuery } from "@/lib/api";
-import type { ChatResult } from "@/lib/types";
+import type { ChatResult } from "@kb/shared";
 import { cn } from "@/lib/utils";
 
 interface CompareState {

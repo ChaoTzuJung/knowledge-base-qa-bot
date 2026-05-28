@@ -1,4 +1,4 @@
-import type { Strategy } from "@/lib/types";
+import type { Strategy } from "@kb/shared";
 import { cn } from "@/lib/utils";
 
 interface Props {

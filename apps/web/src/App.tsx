@@ -6,7 +6,7 @@ import { IndexButton } from "@/components/IndexButton";
 import { SourcesPanel } from "@/components/SourcesPanel";
 import { CompareView } from "@/components/CompareView";
 import { useKbRuntime } from "@/runtime";
-import type { Strategy } from "@/lib/types";
+import type { Strategy } from "@kb/shared";
 import { cn } from "@/lib/utils";
 
 type Mode = "chat" | "compare";

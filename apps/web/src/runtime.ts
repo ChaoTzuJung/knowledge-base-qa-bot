@@ -1,6 +1,6 @@
 import { AssistantChatTransport, useChatRuntime } from "@assistant-ui/react-ai-sdk";
 import { useMemo, useRef } from "react";
-import type { Strategy } from "./lib/types";
+import type { Strategy } from "@kb/shared";
 
 export function useKbRuntime(strategy: Strategy) {
   const strategyRef = useRef(strategy);

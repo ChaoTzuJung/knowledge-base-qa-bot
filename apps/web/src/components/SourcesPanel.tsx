@@ -1,5 +1,5 @@
 import { useAuiState } from "@assistant-ui/react";
-import type { SourceInfo, SourcesPayload, Strategy } from "@/lib/types";
+import type { SourceInfo, SourcesPayload, Strategy } from "@kb/shared";
 
 function isSourcesPayload(value: unknown): value is SourcesPayload {
   return (

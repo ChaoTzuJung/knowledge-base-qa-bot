@@ -1,4 +1,10 @@
-export type Strategy = "markdown_kb" | "vector_rag";
+export type {
+  Strategy,
+  SourceInfo,
+  ChatResult,
+  IndexResult,
+  SourcesPayload,
+} from "@kb/shared";
 
 export interface Section {
   id: string;
@@ -35,18 +41,6 @@ export interface VectorMetadata {
   count: number;
   chunks: Chunk[];
   max_elements: number;
-}
-
-export interface SourceInfo {
-  source: string;
-  heading: string;
-  score: number;
-  content: string;
-}
-
-export interface ChatResult {
-  answer: string;
-  sources: SourceInfo[];
 }
 
 export interface RetrievalHit {

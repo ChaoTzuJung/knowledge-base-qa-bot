@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { buildIndex } from "@/lib/api";
-import type { IndexResult } from "@/lib/types";
+import type { IndexResult } from "@kb/shared";
 import { cn } from "@/lib/utils";
 
 export function IndexButton() {

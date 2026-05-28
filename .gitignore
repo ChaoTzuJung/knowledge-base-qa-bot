@@ -5,3 +5,13 @@ dist/
 .env.local
 .DS_Store
 *.log
+
+# Claude / agent local state
+.claude/
+.agents/
+
+# Playwright artifacts
+.playwright-cli/
+.playwright-mcp/
+test-results/
+apps/e2e/test-results/

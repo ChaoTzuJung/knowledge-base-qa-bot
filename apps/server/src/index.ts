@@ -1,23 +1,8 @@
 import { serve } from "@hono/node-server";
-import { Hono } from "hono";
-import { cors } from "hono/cors";
 import { PORT } from "./env.js";
-import { healthRoute } from "./routes/health.js";
-import { indexRoute } from "./routes/index.js";
-import { chatRoute } from "./routes/chat.js";
-import { chatStreamRoute } from "./routes/chatStream.js";
-import { compareRoute } from "./routes/compare.js";
+import { app } from "./app.js";
 import { loadIndexJson } from "./strategies/markdown-kb/indexer.js";
 import { loadVectorIndex } from "./strategies/vector-rag/indexer.js";
-
-const app = new Hono();
-
-app.use("*", cors());
-app.route("/", healthRoute);
-app.route("/", indexRoute);
-app.route("/", chatRoute);
-app.route("/", chatStreamRoute);
-app.route("/", compareRoute);
 
 try {
   const md = loadIndexJson();

@@ -6,6 +6,7 @@ import {
   type UIMessageStreamWriter,
 } from "ai";
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { OPENAI_MODEL } from "../env.js";
 import { SYSTEM_PROMPT } from "../llm/prompts.js";
@@ -44,7 +45,7 @@ function extractQuery(body: StreamBodyType): string {
   const msgs = body.messages ?? [];
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i];
-    if (m.role !== "user") continue;
+    if (!m || m.role !== "user") continue;
     const candidates: MessagePartType[] = m.parts ?? (Array.isArray(m.content) ? m.content : []);
     const texts = candidates.map(partText).filter((t): t is string => t !== null);
     if (texts.length > 0) return texts.join(" ");
@@ -59,59 +60,71 @@ function writeText(writer: UIMessageStreamWriter, id: string, text: string) {
   writer.write({ type: "text-end", id });
 }
 
-export const chatStreamRoute = new Hono().post("/chat/stream", async (c) => {
-  let body: StreamBodyType;
-  try {
-    body = StreamBody.parse(await c.req.json());
-  } catch {
-    return c.json({ error: "Invalid body. Expect { query | messages, strategy? }" }, 400);
-  }
+export const chatStreamRoute = new Hono().post(
+  "/chat/stream",
+  zValidator("json", StreamBody, (result, c) => {
+    if (!result.success) {
+      return c.json({ error: "Invalid body. Expect { query | messages, strategy? }" }, 400);
+    }
+    return undefined;
+  }),
+  async (c) => {
+    const body = c.req.valid("json");
+    const strategy = body.strategy ?? "markdown_kb";
+    const query = extractQuery(body);
+    if (!query) return c.json({ error: "Empty query" }, 400);
 
-  const strategy = body.strategy ?? "markdown_kb";
-  const query = extractQuery(body);
-  if (!query) return c.json({ error: "Empty query" }, 400);
+    const retrieved = await retrieve(query, strategy);
 
-  const retrieved = await retrieve(query, strategy);
+    const stream = createUIMessageStream({
+      execute: async ({ writer }) => {
+        writer.write({
+          type: "data-sources",
+          id: "sources",
+          data: {
+            strategy,
+            sources: retrieved.sources,
+          },
+        });
 
-  const stream = createUIMessageStream({
-    execute: async ({ writer }) => {
-      writer.write({
-        type: "data-sources",
-        id: "sources",
-        data: {
-          strategy,
-          sources: retrieved.sources,
-        },
-      });
+        if (retrieved.notIndexed) {
+          const which = strategy === "markdown_kb" ? "Markdown KB" : "Vector";
+          writeText(
+            writer,
+            "fallback-text",
+            `The ${which} index has not been built yet. Call POST /index first.`,
+          );
+          return;
+        }
 
-      if (retrieved.notIndexed) {
-        const which = strategy === "markdown_kb" ? "Markdown KB" : "Vector";
-        writeText(
-          writer,
-          "fallback-text",
-          `The ${which} index has not been built yet. Call POST /index first.`,
+        if (!retrieved.ok || !retrieved.prompt) {
+          writeText(writer, "fallback-text", "I cannot confirm from the knowledge base.");
+          return;
+        }
+
+        const result = streamText({
+          model: openai(OPENAI_MODEL),
+          system: SYSTEM_PROMPT,
+          prompt: retrieved.prompt,
+          temperature: 0,
+        });
+        writer.merge(
+          result.toUIMessageStream({
+            messageMetadata: () => ({ strategy, sources: retrieved.sources }),
+            onFinish: ({ responseMessage }) => {
+              console.log(
+                `[/chat/stream] finished strategy=${strategy} parts=${responseMessage.parts.length}`,
+              );
+            },
+          }),
         );
-        return;
-      }
+      },
+      onError: (err) => {
+        console.error("[/chat/stream] error:", err);
+        return err instanceof Error ? err.message : "Stream error";
+      },
+    });
 
-      if (!retrieved.ok || !retrieved.prompt) {
-        writeText(writer, "fallback-text", "I cannot confirm from the knowledge base.");
-        return;
-      }
-
-      const result = streamText({
-        model: openai(OPENAI_MODEL),
-        system: SYSTEM_PROMPT,
-        prompt: retrieved.prompt,
-        temperature: 0,
-      });
-      writer.merge(result.toUIMessageStream());
-    },
-    onError: (err) => {
-      console.error("[/chat/stream] error:", err);
-      return err instanceof Error ? err.message : "Stream error";
-    },
-  });
-
-  return createUIMessageStreamResponse({ stream });
-});
+    return createUIMessageStreamResponse({ stream });
+  },
+);

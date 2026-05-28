@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { buildIndex } from "../strategies/markdown-kb/indexer.js";
 import { buildVectorIndex } from "../strategies/vector-rag/indexer.js";
 
-export const indexRoute = new Hono().post("/index", async (c) => {
+export const indexRoute = new Hono().post("/build-index", async (c) => {
   const md = buildIndex();
   let vector: { files_indexed: number; chunks_indexed: number };
   try {

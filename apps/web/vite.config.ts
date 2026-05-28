@@ -11,7 +11,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/health": "http://localhost:8000",
-      "/index": "http://localhost:8000",
+      "/build-index": "http://localhost:8000",
       "/chat": "http://localhost:8000",
       "/compare": "http://localhost:8000",
     },

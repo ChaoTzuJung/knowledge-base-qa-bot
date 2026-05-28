@@ -1,33 +1,24 @@
-import type { ChatResult, IndexResult, Strategy } from "./types";
+import { hc } from "hono/client";
+import type { AppType } from "@kb/server/app";
 
-export async function buildIndex(): Promise<IndexResult> {
-  const res = await fetch("/index", { method: "POST" });
-  if (!res.ok) throw new Error(`/index failed: ${res.status}`);
+export const client = hc<AppType>(
+  typeof window === "undefined" ? "http://localhost:5173" : window.location.origin,
+);
+
+export async function buildIndex() {
+  const res = await client["build-index"].$post();
+  if (!res.ok) throw new Error(`/build-index failed: ${res.status}`);
   return res.json();
 }
 
-export async function compareQuery(query: string): Promise<{
-  markdown_kb: ChatResult;
-  vector_rag: ChatResult;
-}> {
-  const res = await fetch("/compare", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query }),
-  });
+export async function compareQuery(query: string) {
+  const res = await client.compare.$post({ json: { query } });
   if (!res.ok) throw new Error(`/compare failed: ${res.status}`);
   return res.json();
 }
 
-export async function chatOnce(
-  query: string,
-  strategy: Strategy,
-): Promise<ChatResult & { strategy: Strategy }> {
-  const res = await fetch("/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, strategy }),
-  });
+export async function chatOnce(query: string, strategy: "markdown_kb" | "vector_rag") {
+  const res = await client.chat.$post({ json: { query, strategy } });
   if (!res.ok) throw new Error(`/chat failed: ${res.status}`);
   return res.json();
 }

@@ -48,7 +48,7 @@ export function SourcesPanel() {
   const strategy: Strategy | undefined = payload?.strategy;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" data-testid="sources-panel">
       <div className="flex items-baseline justify-between">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Sources

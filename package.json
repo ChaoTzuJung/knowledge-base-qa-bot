@@ -7,6 +7,8 @@
     "dev:server": "npm --workspace apps/server run dev",
     "dev:web": "npm --workspace apps/web run dev",
     "build": "npm --workspace apps/server run build && npm --workspace apps/web run build",
+    "import:raw": "npm --workspace apps/server run import:raw --",
+    "test:unit": "npm --workspace apps/server run test",
     "test:e2e": "npm --workspace apps/e2e run test"
   }
 }

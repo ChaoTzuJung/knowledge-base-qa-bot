@@ -1,0 +1,12 @@
+---
+source: quick_notes.txt
+title: Quick Notes
+---
+
+# Quick Notes
+
+Support agents should always confirm the customer's order number before discussing account details.
+
+If a customer reports a charge they do not recognize, ask them to check the billing descriptor "FEVER STORE" before opening a dispute.
+
+Gift card balances never expire and cannot be transferred between accounts.

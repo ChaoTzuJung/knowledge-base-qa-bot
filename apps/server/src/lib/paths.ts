@@ -6,6 +6,7 @@ const __dirname = path.dirname(__filename);
 
 export const ROOT = path.resolve(__dirname, "../../../..");
 export const DOCS_DIR = path.join(ROOT, "docs");
+export const RAW_DIR = path.join(ROOT, "raw");
 export const KB_DIR = path.join(ROOT, ".kb");
 export const INDEX_PATH = path.join(KB_DIR, "index.json");
 export const VECTOR_DIR = path.join(KB_DIR, "vector_index");

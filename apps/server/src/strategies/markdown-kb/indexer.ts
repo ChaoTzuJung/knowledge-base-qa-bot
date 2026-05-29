@@ -3,6 +3,7 @@ import path from "node:path";
 import { DOCS_DIR, INDEX_PATH, KB_DIR } from "../../lib/paths.js";
 import type { PersistedIndex, Section } from "../../lib/types.js";
 import { parseMarkdown } from "./parser.js";
+import { writeWikiIndex } from "./wiki.js";
 
 export const state: {
   sections: Section[];
@@ -68,6 +69,7 @@ export function buildIndex(): { files_indexed: number; sections_indexed: number 
     state.sections = [];
     rebuildStats();
     writeIndexJson();
+    writeWikiIndex(state.sections);
     return { files_indexed: 0, sections_indexed: 0 };
   }
 
@@ -85,6 +87,7 @@ export function buildIndex(): { files_indexed: number; sections_indexed: number 
   state.sections = sections;
   rebuildStats();
   writeIndexJson();
+  writeWikiIndex(state.sections);
   return { files_indexed: state.files_indexed, sections_indexed: state.sections.length };
 }
 

@@ -102,6 +102,33 @@ npm run import:raw -- --force   # 覆蓋已存在的 docs
 一個標題，索引器才一定吃得到內容。此腳本只負責正規化——之後再用 **Build Index**
 或 `POST /build-index` 重建索引。
 
+### Wiki 索引（可瀏覽的主題清單）
+
+`wiki/index.md` 是一份給人與 agent 瀏覽的目錄，從 `.kb/index.json` 產生——每個來源
+文件一個 `##`，子段落依標題層級縮排，每一條都連回 `../docs/<file>#<anchor>`。讀者
+（或 agent）不必呼叫 API 就能看出知識庫涵蓋哪些主題。
+
+它會在每次 `POST /build-index` 結束時自動重新產生。若只想從現有索引單獨重建（不重新
+建索引、不需要 API key）：
+
+```bash
+npm run generate:wiki
+```
+
+```text
+# Knowledge Base Index
+
+**5 documents · 17 sections**
+
+## refund_policy.md
+
+- [Refund Policy](../docs/refund_policy.md#refund-policy)
+  - [Cancellation Window](../docs/refund_policy.md#cancellation-window)
+  - [Refund Timeline](../docs/refund_policy.md#refund-timeline)
+```
+
+anchor 與索引器替每個標題指派的 slug 一致，所以連結在任何 Markdown 檢視器都能正確跳轉。
+
 ### Paraphrase 評測（檢索穩健度）
 
 `npm run eval` 會把一組精選的「改寫查詢」——同一個意圖、不同說法——丟進兩種策略的
@@ -140,6 +167,7 @@ Summary (out of 15 paraphrases)
 npm run dev:server   # Hono 後端，:8000
 npm run dev:web      # Vite 前端，:5173
 npm run import:raw   # 將 raw/*.txt|*.html 正規化成 docs/*.md
+npm run generate:wiki # 從 .kb/index.json 重新產生 wiki/index.md
 npm run eval         # paraphrase 檢索評測（BM25 vs 向量）
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test 單元測試（raw→Markdown 轉換函式）
@@ -161,7 +189,7 @@ npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 │   │       ├── index.ts         啟動與伺服
 │   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare
 │   │       ├── strategies/      markdown-kb (BM25), vector-rag (HNSW), 共用 retrieve
-│   │       ├── scripts/         import-raw：raw/*.{txt,html} → docs/*.md（含測試）
+│   │       ├── scripts/         import-raw（raw→docs）+ generate-wiki（索引→wiki）
 │   │       └── eval/            paraphrase：BM25 vs 向量的檢索穩健度評測
 │   ├── web/                     React + Vite + Tailwind + assistant-ui，監聽 :5173
 │   │   └── src/lib/api.ts       透過 hc<AppType> 的 Hono RPC 客戶端
@@ -170,6 +198,7 @@ npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 │   └── shared/                  Strategy、SourceInfo、ChatResult、IndexResult 共用型別
 ├── raw/                         待匯入的 .txt / .html 原始檔放置區
 ├── docs/                        canonical Markdown 知識庫（refund_policy、account_help...）
+├── wiki/                        產生的可瀏覽索引（index.md）；已加入 .gitignore
 ├── .kb/                         產生的索引（已加入 .gitignore）
 │   ├── index.json               BM25 段落 + 統計
 │   └── vector_index/            HNSW 二進位檔 + metadata.json
@@ -258,7 +287,7 @@ Playwright 涵蓋可見流程，位於 `apps/e2e/tests/`：
 
 Playwright 設定檔的 `webServer` 區塊讓 `npm run test:e2e` 自動啟動 `dev:server` 與 `dev:web`，或於本地重複使用已啟動的實例。
 
-單元測試使用 Node 內建的 `node:test`（零依賴），涵蓋 `apps/server/src/scripts/import-raw.test.ts` 裡的純 raw→Markdown 轉換函式。以 `npm run test:unit` 執行。
+單元測試使用 Node 內建的 `node:test`（零依賴），涵蓋純函式：`apps/server/src/scripts/import-raw.test.ts` 的 raw→Markdown 轉換，以及 `apps/server/src/strategies/markdown-kb/wiki.test.ts` 的 wiki 索引產生。以 `npm run test:unit` 執行。
 
 ---
 

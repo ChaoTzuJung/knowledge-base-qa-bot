@@ -108,6 +108,35 @@ filename, and a heading is guaranteed so the indexers always pick it up. The
 script only normalizes — rebuild afterwards with **Build Index** or
 `POST /build-index`.
 
+### Wiki index (browsable topic list)
+
+`wiki/index.md` is a human- and agent-browsable table of contents generated from
+`.kb/index.json` — one `##` per source doc, with sub-sections nested by heading depth and
+each entry linking back to `../docs/<file>#<anchor>`. It lets a reader (or an agent) see
+what the knowledge base covers without calling the API.
+
+It is regenerated automatically at the end of every `POST /build-index`. To rebuild it on
+its own from the existing index (no re-indexing, no API key):
+
+```bash
+npm run generate:wiki
+```
+
+```text
+# Knowledge Base Index
+
+**5 documents · 17 sections**
+
+## refund_policy.md
+
+- [Refund Policy](../docs/refund_policy.md#refund-policy)
+  - [Cancellation Window](../docs/refund_policy.md#cancellation-window)
+  - [Refund Timeline](../docs/refund_policy.md#refund-timeline)
+```
+
+The anchors match the slugs the indexer assigns to each heading, so the links resolve in any
+Markdown viewer.
+
 ### Paraphrase eval (retrieval robustness)
 
 `npm run eval` runs a curated set of paraphrased queries — the *same* intent phrased
@@ -148,6 +177,7 @@ intents and paraphrases there.
 npm run dev:server   # Hono backend, :8000
 npm run dev:web      # Vite frontend, :5173
 npm run import:raw   # normalize raw/*.txt|*.html into docs/*.md
+npm run generate:wiki # regenerate wiki/index.md from .kb/index.json
 npm run eval         # paraphrase retrieval eval (BM25 vs vector)
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test unit tests (raw→Markdown helpers)
@@ -169,7 +199,7 @@ npm run test:e2e     # Playwright suite (auto-starts both dev servers)
 │   │       ├── index.ts         startup + serve
 │   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare
 │   │       ├── strategies/      markdown-kb (BM25), vector-rag (HNSW), shared retrieve
-│   │       ├── scripts/         import-raw: raw/*.{txt,html} → docs/*.md (+ tests)
+│   │       ├── scripts/         import-raw (raw→docs) + generate-wiki (index→wiki)
 │   │       └── eval/            paraphrase: BM25 vs vector retrieval robustness
 │   ├── web/                     React + Vite + Tailwind + assistant-ui on :5173
 │   │   └── src/lib/api.ts       typed Hono RPC client via hc<AppType>
@@ -178,6 +208,7 @@ npm run test:e2e     # Playwright suite (auto-starts both dev servers)
 │   └── shared/                  Strategy, SourceInfo, ChatResult, IndexResult
 ├── raw/                         drop-zone for .txt / .html sources to import
 ├── docs/                        canonical Markdown KB (refund_policy, account_help, ...)
+├── wiki/                        generated browsable index (index.md); gitignored
 ├── .kb/                         generated indexes (gitignored)
 │   ├── index.json               BM25 sections + stats
 │   └── vector_index/            HNSW binary + metadata.json
@@ -282,9 +313,10 @@ The Playwright config has a `webServer` block, so `npm run test:e2e` boots both
 `dev:server` and `dev:web` automatically (or reuses already-running instances
 locally).
 
-Unit tests use Node's built-in `node:test` (zero dependencies) and cover the
-pure raw→Markdown conversion helpers in `apps/server/src/scripts/import-raw.test.ts`.
-Run them with `npm run test:unit`.
+Unit tests use Node's built-in `node:test` (zero dependencies) and cover the pure
+helpers: raw→Markdown conversion in `apps/server/src/scripts/import-raw.test.ts` and
+wiki-index rendering in `apps/server/src/strategies/markdown-kb/wiki.test.ts`. Run them
+with `npm run test:unit`.
 
 ---
 

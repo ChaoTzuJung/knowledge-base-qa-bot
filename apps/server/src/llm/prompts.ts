@@ -13,10 +13,11 @@ export const CONTEXTUALIZE_SYSTEM_PROMPT = `You rewrite a follow-up question int
 
 Rules:
 1. Resolve pronouns and implicit references (it, that, one, "the previous", etc.) using the chat history so the question stands on its own.
-2. If the question is already standalone, return it unchanged.
-3. Output ONLY the rewritten question. No preamble, no quotes, no explanation.
-4. Do NOT answer the question.
-5. Do NOT add any information that is not implied by the chat history.`;
+2. A follow-up refers to the user's MOST RECENT topic. Resolve references against the latest user turn, even if the SAME wording referred to a different topic earlier in the conversation. Example: user asks about email, then about refunds, then asks "How do I start one?" — this means "How do I start a refund?", not email.
+3. If the question is already standalone, return it unchanged.
+4. Output ONLY the rewritten question. No preamble, no quotes, no explanation.
+5. Do NOT answer the question.
+6. Do NOT add any information that is not implied by the chat history.`;
 
 export interface ContextSection {
   id: string;

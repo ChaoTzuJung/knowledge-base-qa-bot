@@ -108,12 +108,47 @@ filename, and a heading is guaranteed so the indexers always pick it up. The
 script only normalizes — rebuild afterwards with **Build Index** or
 `POST /build-index`.
 
+### Paraphrase eval (retrieval robustness)
+
+`npm run eval` runs a curated set of paraphrased queries — the *same* intent phrased
+different ways — through both strategies' retrieval layer (no LLM answer) and reports
+whether each strategy still surfaces the expected section. It makes the two failure
+modes concrete: BM25 misses synonyms ("money back" never matches the word "refund"),
+while vector search can return a semantically related but wrong section.
+
+```bash
+npm run eval   # build the index first: POST /build-index, or ensure .kb/ exists
+```
+
+The BM25 column needs no API key; the vector column embeds each query, so it needs
+`OPENAI_API_KEY` (without it those cells degrade to an error and the BM25 column
+still prints).
+
+```text
+▸ refund timing   →  expect: refund_policy.md#refund-timeline
+   "How long do refunds take?"
+       BM25    ✅ refund_policy.md#refund-timeline  (2.152)
+       Vector  ✅ refund_policy.md#refund-timeline  (0.683)
+   "When will I get my money back?"
+       BM25    ⚠️  cannot-confirm (below threshold)
+       Vector  ✅ refund_policy.md#refund-timeline  (0.466)
+
+Summary (out of 15 paraphrases)
+   Markdown KB (BM25):   hit@1 10/15    hit@3 11/15
+   Vector RAG:           hit@1 14/15    hit@3 15/15
+```
+
+Legend: ✅ expected is top-1, 🔸 expected in top-3, ❌ wrong section. The probes live
+in [`apps/server/src/eval/paraphrase.ts`](apps/server/src/eval/paraphrase.ts) — add
+intents and paraphrases there.
+
 ### Scripts
 
 ```bash
 npm run dev:server   # Hono backend, :8000
 npm run dev:web      # Vite frontend, :5173
 npm run import:raw   # normalize raw/*.txt|*.html into docs/*.md
+npm run eval         # paraphrase retrieval eval (BM25 vs vector)
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test unit tests (raw→Markdown helpers)
 npm run test:e2e     # Playwright suite (auto-starts both dev servers)
@@ -134,7 +169,8 @@ npm run test:e2e     # Playwright suite (auto-starts both dev servers)
 │   │       ├── index.ts         startup + serve
 │   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare
 │   │       ├── strategies/      markdown-kb (BM25), vector-rag (HNSW), shared retrieve
-│   │       └── scripts/         import-raw: raw/*.{txt,html} → docs/*.md (+ tests)
+│   │       ├── scripts/         import-raw: raw/*.{txt,html} → docs/*.md (+ tests)
+│   │       └── eval/            paraphrase: BM25 vs vector retrieval robustness
 │   ├── web/                     React + Vite + Tailwind + assistant-ui on :5173
 │   │   └── src/lib/api.ts       typed Hono RPC client via hc<AppType>
 │   └── e2e/                     Playwright suite; auto-starts dev servers via webServer

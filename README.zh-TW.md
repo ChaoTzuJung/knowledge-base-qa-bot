@@ -102,12 +102,45 @@ npm run import:raw -- --force   # 覆蓋已存在的 docs
 一個標題，索引器才一定吃得到內容。此腳本只負責正規化——之後再用 **Build Index**
 或 `POST /build-index` 重建索引。
 
+### Paraphrase 評測（檢索穩健度）
+
+`npm run eval` 會把一組精選的「改寫查詢」——同一個意圖、不同說法——丟進兩種策略的
+檢索層（不呼叫 LLM 產生回答），回報每種策略是否仍命中預期的段落。它把兩種失敗模式
+具體化：BM25 漏同義詞（「money back」永遠對不上「refund」這個字），而向量檢索可能撈到
+語意相近但其實錯誤的段落。
+
+```bash
+npm run eval   # 請先建立索引：POST /build-index，或確保 .kb/ 已存在
+```
+
+BM25 欄位不需 API key；向量欄位會對每個查詢做嵌入，因此需要 `OPENAI_API_KEY`
+（未設定時這些格子會降級為 error，BM25 欄位仍正常印出）。
+
+```text
+▸ refund timing   →  expect: refund_policy.md#refund-timeline
+   "How long do refunds take?"
+       BM25    ✅ refund_policy.md#refund-timeline  (2.152)
+       Vector  ✅ refund_policy.md#refund-timeline  (0.683)
+   "When will I get my money back?"
+       BM25    ⚠️  cannot-confirm (below threshold)
+       Vector  ✅ refund_policy.md#refund-timeline  (0.466)
+
+Summary (out of 15 paraphrases)
+   Markdown KB (BM25):   hit@1 10/15    hit@3 11/15
+   Vector RAG:           hit@1 14/15    hit@3 15/15
+```
+
+圖例：✅ 預期段落為 top-1、🔸 預期段落落在 top-3、❌ 命中錯誤段落。題庫位於
+[`apps/server/src/eval/paraphrase.ts`](apps/server/src/eval/paraphrase.ts)，可在此
+新增意圖與改寫句。
+
 ### 常用腳本
 
 ```bash
 npm run dev:server   # Hono 後端，:8000
 npm run dev:web      # Vite 前端，:5173
 npm run import:raw   # 將 raw/*.txt|*.html 正規化成 docs/*.md
+npm run eval         # paraphrase 檢索評測（BM25 vs 向量）
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test 單元測試（raw→Markdown 轉換函式）
 npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
@@ -128,7 +161,8 @@ npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 │   │       ├── index.ts         啟動與伺服
 │   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare
 │   │       ├── strategies/      markdown-kb (BM25), vector-rag (HNSW), 共用 retrieve
-│   │       └── scripts/         import-raw：raw/*.{txt,html} → docs/*.md（含測試）
+│   │       ├── scripts/         import-raw：raw/*.{txt,html} → docs/*.md（含測試）
+│   │       └── eval/            paraphrase：BM25 vs 向量的檢索穩健度評測
 │   ├── web/                     React + Vite + Tailwind + assistant-ui，監聽 :5173
 │   │   └── src/lib/api.ts       透過 hc<AppType> 的 Hono RPC 客戶端
 │   └── e2e/                     Playwright 測試；透過 webServer 自動啟動 dev servers

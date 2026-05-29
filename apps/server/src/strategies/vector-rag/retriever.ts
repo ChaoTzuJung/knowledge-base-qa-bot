@@ -3,14 +3,19 @@ import { getOpenAI } from "../../llm/client.js";
 import type { Chunk } from "../../lib/types.js";
 import { vectorState } from "./indexer.js";
 
-const SIMILARITY_THRESHOLD = 0.3;
+/** Minimum top cosine similarity to treat a vector result as a confident match. */
+export const SIMILARITY_THRESHOLD = 0.3;
 
 export interface VectorHit {
   chunk: Chunk;
   score: number;
 }
 
-export async function vectorSearch(query: string, k = 3): Promise<VectorHit[]> {
+export async function vectorSearch(
+  query: string,
+  k = 3,
+  threshold = SIMILARITY_THRESHOLD,
+): Promise<VectorHit[]> {
   if (!vectorState.index || vectorState.chunks.length === 0) return [];
 
   const openai = getOpenAI();
@@ -33,6 +38,6 @@ export async function vectorSearch(query: string, k = 3): Promise<VectorHit[]> {
     hits.push({ chunk, score: similarity });
   }
 
-  if (hits.length === 0 || hits[0].score < SIMILARITY_THRESHOLD) return [];
+  if (hits.length === 0 || hits[0].score < threshold) return [];
   return hits;
 }

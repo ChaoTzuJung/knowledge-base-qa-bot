@@ -14,7 +14,7 @@ type Mode = "chat" | "compare";
 
 export default function App() {
   const [mode, setMode] = useState<Mode>("chat");
-  const [strategy, setStrategy] = useState<Strategy>("markdown_kb");
+  const [strategy, setStrategy] = useState<Strategy>("hybrid");
   const runtime = useKbRuntime(strategy);
 
   return (

@@ -26,7 +26,7 @@ const StreamBody = z
   .object({
     query: z.string().optional(),
     messages: z.array(UIMessageSchema).optional(),
-    strategy: z.enum(["markdown_kb", "vector_rag"]).optional(),
+    strategy: z.enum(["markdown_kb", "vector_rag", "hybrid"]).optional(),
   })
   .refine((v) => v.query || (v.messages && v.messages.length > 0), {
     message: "Provide either query or messages.",
@@ -100,7 +100,7 @@ export const chatStreamRoute = new Hono().post(
   }),
   async (c) => {
     const body = c.req.valid("json");
-    const strategy = body.strategy ?? "markdown_kb";
+    const strategy = body.strategy ?? "hybrid";
     const question = extractQuery(body);
     if (!question) return c.json({ error: "Empty query" }, 400);
 
@@ -132,7 +132,8 @@ export const chatStreamRoute = new Hono().post(
         }
 
         if (retrieved.notIndexed) {
-          const which = strategy === "markdown_kb" ? "Markdown KB" : "Vector";
+          const which =
+            strategy === "markdown_kb" ? "Markdown KB" : strategy === "vector_rag" ? "Vector" : "Hybrid";
           writeText(
             writer,
             "fallback-text",

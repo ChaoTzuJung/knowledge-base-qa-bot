@@ -28,7 +28,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 
 ## Features
 
-- **Two interchangeable retrieval strategies** — Markdown KB (BM25) and Vector RAG (HNSW), switchable per query, with a side-by-side `/compare` view ([why](#why-two-retrieval-strategies)).
+- **Three retrieval strategies** — Markdown KB (BM25), Vector RAG (HNSW), and **Hybrid (the default)**, which fuses both with Reciprocal Rank Fusion; switchable per query, with a side-by-side `/compare` view ([why](#why-two-retrieval-strategies)).
 - **Grounded answers with inline citations**, streamed token-by-token over the AI SDK v6 [streaming protocol](#streaming-protocol).
 - **Honest "I cannot confirm"** instead of hallucinating when nothing matches ([why](#why-explicit-i-cannot-confirm)).
 - **Conversation memory** that rewrites follow-ups into standalone queries ([details](#conversation-memory-follow-up-questions)).
@@ -301,7 +301,7 @@ it, so single-turn behavior is unchanged.
 |--------|-----------------|---------------------------------------------------------------|-----------------------------------------------------------|
 | GET    | `/health`       | —                                                             | `{ "status": "ok" }`                                      |
 | POST   | `/build-index`  | —                                                             | `{ files_indexed, sections_indexed, chunks_indexed, ... }`|
-| POST   | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" }`         | `{ answer, sources, strategy }`                           |
+| POST   | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" }` | `{ answer, sources, strategy }`                       |
 | POST   | `/chat/stream`  | `{ query, strategy? }` or `{ messages: [...], strategy? }`    | AI SDK UI message stream (SSE)                            |
 | POST   | `/compare`      | `{ query }`                                                   | `{ markdown_kb: {...}, vector_rag: {...} }`               |
 | POST   | `/file-answer`  | `{ query, answer, sources?, strategy? }`                     | `{ filed, slug, file }`                                   |
@@ -418,6 +418,14 @@ itself contains the keywords; "When will I get my money back?" → vector wins
 because "money back" never matches the word "refund", so BM25 can't ground an
 answer while vector still retrieves the refund timeline). The Compare tab in the
 demo at the top of this README shows exactly this contrast.
+
+**Hybrid is the default** so you don't have to choose per query: it runs both
+retrievers and fuses their rankings with Reciprocal Rank Fusion (RRF, K=60), so a
+section ranked highly by *either* signal rises to the top — BM25's exact-keyword
+precision plus vector's synonym recall. RRF combines *ranks*, not the raw,
+non-comparable BM25/cosine scores. It still answers only when at least one
+retriever clears its own confidence threshold, preserving the "I cannot confirm"
+guarantee.
 
 ### Why a heading section as the retrieval unit?
 

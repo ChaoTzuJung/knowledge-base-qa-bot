@@ -8,19 +8,34 @@ RAG (HNSW over OpenAI embeddings) — and streams the answer with inline citatio
 The web client is built on [assistant-ui](https://www.assistant-ui.com/) and the
 [Vercel AI SDK v6](https://ai-sdk.dev/) UI message stream protocol.
 
+![Demo: grounded answer with sources, follow-up memory, and the honest "I cannot confirm" fallback](.github/assets/demo.gif)
+
+> Ask a question → sources stream in first, then the cited answer. Follow-ups resolve in context, out-of-scope questions get an honest "I cannot confirm" — never a hallucination — and the Compare tab runs both retrieval strategies on the same question, side by side.
+
+## Quickstart
+
+> **Prerequisites:** Node.js 20+ and an `OPENAI_API_KEY`. See [Prerequisites](#prerequisites) for optional env vars.
+
+```bash
+export OPENAI_API_KEY="sk-..."
+npm install
+npm run dev:server   # terminal 1 — Hono on :8000
+npm run dev:web      # terminal 2 — Vite on :5173 (proxies to :8000)
 ```
-┌────────────┐   POST /chat/stream    ┌──────────────┐
-│  React +   │ ─────────────────────▶ │  Hono server │
-│ assistant- │                        │  (Node.js)   │
-│    ui      │  data-sources part     │              │
-│            │  ◀── text-* parts ──── │   strategies │
-└────────────┘                        └──────┬───────┘
-                                             │
-                                  ┌──────────┴──────────┐
-                                  ▼                     ▼
-                         markdown_kb (BM25)     vector_rag (HNSW
-                         heading sections        + embeddings)
-```
+
+Then open <http://localhost:5173>. On first load the indexes are empty — click
+**Build Index** in the sidebar (or `POST /build-index`) before asking questions.
+
+## Features
+
+- **Two interchangeable retrieval strategies** — Markdown KB (BM25) and Vector RAG (HNSW), switchable per query, with a side-by-side `/compare` view ([why](#why-two-retrieval-strategies)).
+- **Grounded answers with inline citations**, streamed token-by-token over the AI SDK v6 [streaming protocol](#streaming-protocol).
+- **Honest "I cannot confirm"** instead of hallucinating when nothing matches ([why](#why-explicit-i-cannot-confirm)).
+- **Conversation memory** that rewrites follow-ups into standalone queries ([details](#conversation-memory-follow-up-questions)).
+- **Persist & browse** — [file reviewed answers](#answer-filing-persist-reviewed-qa) back into the KB and generate a [browsable wiki index](#wiki-index-browsable-topic-list).
+- **End-to-end type safety** (Hono RPC), a [paraphrase eval harness](#paraphrase-eval-retrieval-robustness), and Playwright + unit [tests](#tests).
+
+**Contents:** [How to use](#1--how-to-use) · [Advanced usage](#2--advanced-usage) · [How it works](#3--how-it-works) · [Design decisions](#4--design-decisions)
 
 ---
 
@@ -44,17 +59,6 @@ Optional environment variables:
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small`  | Embedding model for the vector index   |
 | `PORT`                   | `8000`                    | Server port                            |
 
-### Install & run
-
-```bash
-npm install
-npm run dev:server   # terminal 1 — Hono on :8000
-npm run dev:web      # terminal 2 — Vite on :5173 (proxies to :8000)
-```
-
-Then open <http://localhost:5173>. On first load the indexes are empty — click
-**Build Index** in the sidebar (or `POST /build-index`) before asking questions.
-
 ### Try it with curl
 
 ```bash
@@ -70,7 +74,12 @@ curl -X POST http://localhost:8000/build-index
 curl -X POST http://localhost:8000/chat \
   -H 'Content-Type: application/json' \
   -d '{"query":"How long do refunds take?"}'
+```
 
+<details>
+<summary>More curl examples — vector strategy, honest fallback, streaming, compare</summary>
+
+```bash
 # Same query, vector strategy
 curl -X POST http://localhost:8000/chat \
   -H 'Content-Type: application/json' \
@@ -92,6 +101,25 @@ curl -X POST http://localhost:8000/compare \
   -H 'Content-Type: application/json' \
   -d '{"query":"How long do refunds take?"}'
 ```
+
+</details>
+
+### Scripts
+
+```bash
+npm run dev:server   # Hono backend, :8000
+npm run dev:web      # Vite frontend, :5173
+npm run import:raw   # normalize raw/*.txt|*.html into docs/*.md
+npm run generate:wiki # regenerate wiki/index.md from .kb/index.json
+npm run eval         # paraphrase retrieval eval (BM25 vs vector)
+npm run build        # tsc -b + vite build
+npm run test:unit    # node:test unit tests (raw→Markdown helpers)
+npm run test:e2e     # Playwright suite (auto-starts both dev servers)
+```
+
+---
+
+## 2 · Advanced usage
 
 ### Import raw sources (optional)
 
@@ -222,22 +250,23 @@ curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d
 The rewrite needs `OPENAI_API_KEY` (one small extra call per follow-up); the first turn skips
 it, so single-turn behavior is unchanged.
 
-### Scripts
-
-```bash
-npm run dev:server   # Hono backend, :8000
-npm run dev:web      # Vite frontend, :5173
-npm run import:raw   # normalize raw/*.txt|*.html into docs/*.md
-npm run generate:wiki # regenerate wiki/index.md from .kb/index.json
-npm run eval         # paraphrase retrieval eval (BM25 vs vector)
-npm run build        # tsc -b + vite build
-npm run test:unit    # node:test unit tests (raw→Markdown helpers)
-npm run test:e2e     # Playwright suite (auto-starts both dev servers)
-```
-
 ---
 
-## 2 · How it works
+## 3 · How it works
+
+```
+┌────────────┐   POST /chat/stream    ┌──────────────┐
+│  React +   │ ─────────────────────▶ │  Hono server │
+│ assistant- │                        │  (Node.js)   │
+│    ui      │  data-sources part     │              │
+│            │  ◀── text-* parts ──── │   strategies │
+└────────────┘                        └──────┬───────┘
+                                             │
+                                  ┌──────────┴──────────┐
+                                  ▼                     ▼
+                         markdown_kb (BM25)     vector_rag (HNSW
+                         heading sections        + embeddings)
+```
 
 ### Repository layout
 
@@ -377,7 +406,7 @@ answer filing (citation rewriting, index rendering) in
 
 ---
 
-## 3 · Design decisions
+## 4 · Design decisions
 
 ### Why two retrieval strategies?
 
@@ -385,8 +414,10 @@ The brief asked for grounded Q&A. BM25 and vector RAG have different failure mod
 and the corpus is small enough that running both in parallel is cheap. `/compare`
 makes the difference visible so the reader can build intuition for when each
 strategy wins ("How long do refunds take?" → BM25 nails it because the heading
-itself contains the keywords; "Can I change my email address?" → vector wins
-because the heading is "Update account email" with no overlap in surface form).
+itself contains the keywords; "When will I get my money back?" → vector wins
+because "money back" never matches the word "refund", so BM25 can't ground an
+answer while vector still retrieves the refund timeline). The Compare tab in the
+demo at the top of this README shows exactly this contrast.
 
 ### Why a heading section as the retrieval unit?
 

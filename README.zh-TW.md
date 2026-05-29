@@ -5,19 +5,33 @@
 一個可自架的本地 Markdown 知識庫問答聊天機器人。伺服器提供 **兩種可互換的檢索策略** —— Markdown KB（BM25）與 Vector RAG（HNSW + OpenAI 嵌入）—— 並在回答中即時串流附帶來源引用的內容。
 Web 前端基於 [assistant-ui](https://www.assistant-ui.com/) 與 [Vercel AI SDK v6](https://ai-sdk.dev/) 的 UI 訊息串流協定。
 
+![Demo：附來源的回答、追問記憶，以及誠實的「我無法確認」備援](.github/assets/demo.gif)
+
+> 發問 → 來源先串流出現，接著是附引用的答案。追問會依脈絡解讀，超出範圍的問題誠實回「我無法確認」、絕不幻覺，而 Compare 分頁則把兩種檢索策略放在同一問題下並排比較。
+
+## 快速開始
+
+> **前置條件：** Node.js 20+ 與 `OPENAI_API_KEY`。可選環境變數見 [前置條件](#前置條件)。
+
+```bash
+export OPENAI_API_KEY="sk-..."
+npm install
+npm run dev:server   # 終端 1 —— Hono 啟動於 :8000
+npm run dev:web      # 終端 2 —— Vite 啟動於 :5173（反向代理至 :8000）
 ```
-┌────────────┐   POST /chat/stream    ┌──────────────┐
-│  React +   │ ─────────────────────▶ │  Hono server │
-│ assistant- │                        │  (Node.js)   │
-│    ui      │  data-sources part     │              │
-│            │  ◀── text-* parts ──── │   strategies │
-└────────────┘                        └──────┬───────┘
-                                             │
-                                  ┌──────────┴──────────┐
-                                  ▼                     ▼
-                         markdown_kb (BM25)     vector_rag (HNSW
-                         heading sections        + embeddings)
-```
+
+接著開啟 <http://localhost:5173>。首次載入時索引是空的 —— 點擊側邊欄的 **Build Index**（或 `POST /build-index`）後才能提問。
+
+## 功能特色
+
+- **兩種可互換的檢索策略** —— Markdown KB（BM25）與 Vector RAG（HNSW），可逐次查詢切換，並有並排 `/compare` 比較（[原因](#為何提供兩種檢索策略)）。
+- **具來源引用的答案**，以 AI SDK v6 [串流協議](#串流協議)逐字串流。
+- **誠實的「我無法確認」**，沒命中時不幻覺（[原因](#為何明確我無法確認)）。
+- **對話記憶**，把追問改寫成獨立完整的查詢（[細節](#對話記憶追問)）。
+- **歸檔與瀏覽** —— 把[審核過的答案歸檔](#answer-filing歸檔已審核的-qa)回知識庫，並產生[可瀏覽的 wiki 索引](#wiki-索引可瀏覽的主題清單)。
+- **端對端型別安全**（Hono RPC）、[paraphrase 評測](#paraphrase-評測檢索穩健度)與 Playwright + 單元[測試](#測試)。
+
+**目錄：** [如何使用](#1--如何使用) · [進階使用](#2--進階使用) · [運作原理](#3--運作原理) · [設計決策](#4--設計決策)
 
 ---
 
@@ -40,16 +54,6 @@ export OPENAI_API_KEY="sk-..."
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | 嵌入模型（向量索引用)                |
 | `PORT`                   | `8000`                   | 伺服器埠號                           |
 
-### 安裝與啟動
-
-```bash
-npm install
-npm run dev:server   # 終端 1 —— Hono 啟動於 :8000
-npm run dev:web      # 終端 2 —— Vite 啟動於 :5173（反向代理至 :8000）
-```
-
-接著開啟 <http://localhost:5173>。首次載入時索引是空的 —— 點擊側邊欄的 **Build Index**（或 `POST /build-index`）後才能提問。
-
 ### 用 curl 試玩
 
 ```bash
@@ -65,7 +69,12 @@ curl -X POST http://localhost:8000/build-index
 curl -X POST http://localhost:8000/chat \
   -H 'Content-Type: application/json' \
   -d '{"query":"退款多久入帳？"}'
+```
 
+<details>
+<summary>更多 curl 範例 —— 向量策略、誠實備援、串流、比較</summary>
+
+```bash
 # 相同問題，改採向量策略
 curl -X POST http://localhost:8000/chat \
   -H 'Content-Type: application/json' \
@@ -87,6 +96,25 @@ curl -X POST http://localhost:8000/compare \
   -H 'Content-Type: application/json' \
   -d '{"query":"退款多久入帳？"}'
 ```
+
+</details>
+
+### 常用腳本
+
+```bash
+npm run dev:server   # Hono 後端，:8000
+npm run dev:web      # Vite 前端，:5173
+npm run import:raw   # 將 raw/*.txt|*.html 正規化成 docs/*.md
+npm run generate:wiki # 從 .kb/index.json 重新產生 wiki/index.md
+npm run eval         # paraphrase 檢索評測（BM25 vs 向量）
+npm run build        # tsc -b + vite build
+npm run test:unit    # node:test 單元測試（raw→Markdown 轉換函式）
+npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
+```
+
+---
+
+## 2 · 進階使用
 
 ### 匯入原始檔（選用）
 
@@ -207,22 +235,23 @@ curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d
 
 改寫需要 `OPENAI_API_KEY`（每次追問多一次小型呼叫）；第一輪會略過，因此單輪行為維持不變。
 
-### 常用腳本
-
-```bash
-npm run dev:server   # Hono 後端，:8000
-npm run dev:web      # Vite 前端，:5173
-npm run import:raw   # 將 raw/*.txt|*.html 正規化成 docs/*.md
-npm run generate:wiki # 從 .kb/index.json 重新產生 wiki/index.md
-npm run eval         # paraphrase 檢索評測（BM25 vs 向量）
-npm run build        # tsc -b + vite build
-npm run test:unit    # node:test 單元測試（raw→Markdown 轉換函式）
-npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
-```
-
 ---
 
-## 2 · 運作原理
+## 3 · 運作原理
+
+```
+┌────────────┐   POST /chat/stream    ┌──────────────┐
+│  React +   │ ─────────────────────▶ │  Hono server │
+│ assistant- │                        │  (Node.js)   │
+│    ui      │  data-sources part     │              │
+│            │  ◀── text-* parts ──── │   strategies │
+└────────────┘                        └──────┬───────┘
+                                             │
+                                  ┌──────────┴──────────┐
+                                  ▼                     ▼
+                         markdown_kb (BM25)     vector_rag (HNSW
+                         heading sections        + embeddings)
+```
 
 ### 目錄結構
 
@@ -339,13 +368,13 @@ Playwright 設定檔的 `webServer` 區塊讓 `npm run test:e2e` 自動啟動 `d
 
 ---
 
-## 3 · 設計決策
+## 4 · 設計決策
 
 ### 為何提供兩種檢索策略？
 
 題目要求「具來源引用」。BM25 與向量 RAG 的失敗模式不同，且語料小，並行執行成本極低。`/compare` 可視化差異，讓讀者建立直覺：
 「退款多久入帳？」 → BM25 因標題含關鍵字而命中；
-「如何更改電子郵件？」 → 向量勝出，因標題為「更新帳號電子郵件」無表面重疊。
+「When will I get my money back?（我的錢何時退回？）」 → 向量勝出，因「money back」對不上「refund」這個字，BM25 無法據以回答，而向量仍能檢索到退款時程段落。本 README 最上方的 demo 即示範了這個對比。
 
 ### 為何以標題段落為檢索單位？
 

@@ -88,12 +88,28 @@ curl -X POST http://localhost:8000/compare \
   -d '{"query":"退款多久入帳？"}'
 ```
 
+### 匯入原始檔（選用）
+
+知識庫以 `docs/` 底下的 canonical Markdown 為準。若要匯入純文字或 HTML 來源，
+把檔案放進 `raw/`，再正規化成 `docs/*.md`：
+
+```bash
+npm run import:raw              # raw/*.txt | raw/*.html -> docs/*.md
+npm run import:raw -- --force   # 覆蓋已存在的 docs
+```
+
+每個轉換後的檔案都會加上 YAML front matter 記錄原始 `source` 檔名，並保證至少有
+一個標題，索引器才一定吃得到內容。此腳本只負責正規化——之後再用 **Build Index**
+或 `POST /build-index` 重建索引。
+
 ### 常用腳本
 
 ```bash
 npm run dev:server   # Hono 後端，:8000
 npm run dev:web      # Vite 前端，:5173
+npm run import:raw   # 將 raw/*.txt|*.html 正規化成 docs/*.md
 npm run build        # tsc -b + vite build
+npm run test:unit    # node:test 單元測試（raw→Markdown 轉換函式）
 npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 ```
 
@@ -111,13 +127,15 @@ npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 │   │       ├── app.ts           鏈式 Hono 建構器；匯出 AppType 供 RPC 使用
 │   │       ├── index.ts         啟動與伺服
 │   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare
-│   │       └── strategies/      markdown-kb (BM25), vector-rag (HNSW), 共用 retrieve
+│   │       ├── strategies/      markdown-kb (BM25), vector-rag (HNSW), 共用 retrieve
+│   │       └── scripts/         import-raw：raw/*.{txt,html} → docs/*.md（含測試）
 │   ├── web/                     React + Vite + Tailwind + assistant-ui，監聽 :5173
 │   │   └── src/lib/api.ts       透過 hc<AppType> 的 Hono RPC 客戶端
 │   └── e2e/                     Playwright 測試；透過 webServer 自動啟動 dev servers
 ├── packages/
 │   └── shared/                  Strategy、SourceInfo、ChatResult、IndexResult 共用型別
-├── docs/                        範例 Markdown 知識庫（refund_policy、account_help...）
+├── raw/                         待匯入的 .txt / .html 原始檔放置區
+├── docs/                        canonical Markdown 知識庫（refund_policy、account_help...）
 ├── .kb/                         產生的索引（已加入 .gitignore）
 │   ├── index.json               BM25 段落 + 統計
 │   └── vector_index/            HNSW 二進位檔 + metadata.json
@@ -205,6 +223,8 @@ Playwright 涵蓋可見流程，位於 `apps/e2e/tests/`：
 - `out-of-scope` —— 餐廳問題觸發「無法確認」並清空來源面板。
 
 Playwright 設定檔的 `webServer` 區塊讓 `npm run test:e2e` 自動啟動 `dev:server` 與 `dev:web`，或於本地重複使用已啟動的實例。
+
+單元測試使用 Node 內建的 `node:test`（零依賴），涵蓋 `apps/server/src/scripts/import-raw.test.ts` 裡的純 raw→Markdown 轉換函式。以 `npm run test:unit` 執行。
 
 ---
 

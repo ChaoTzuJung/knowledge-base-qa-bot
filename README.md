@@ -93,12 +93,29 @@ curl -X POST http://localhost:8000/compare \
   -d '{"query":"How long do refunds take?"}'
 ```
 
+### Import raw sources (optional)
+
+The knowledge base is canonical Markdown under `docs/`. To bring in plain-text or
+HTML sources, drop them in `raw/` and normalize them into `docs/*.md`:
+
+```bash
+npm run import:raw              # raw/*.txt | raw/*.html -> docs/*.md
+npm run import:raw -- --force   # overwrite docs that already exist
+```
+
+Each converted file gets YAML front matter recording its original `source`
+filename, and a heading is guaranteed so the indexers always pick it up. The
+script only normalizes — rebuild afterwards with **Build Index** or
+`POST /build-index`.
+
 ### Scripts
 
 ```bash
 npm run dev:server   # Hono backend, :8000
 npm run dev:web      # Vite frontend, :5173
+npm run import:raw   # normalize raw/*.txt|*.html into docs/*.md
 npm run build        # tsc -b + vite build
+npm run test:unit    # node:test unit tests (raw→Markdown helpers)
 npm run test:e2e     # Playwright suite (auto-starts both dev servers)
 ```
 
@@ -116,13 +133,15 @@ npm run test:e2e     # Playwright suite (auto-starts both dev servers)
 │   │       ├── app.ts           chained Hono builder; exports AppType for RPC
 │   │       ├── index.ts         startup + serve
 │   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare
-│   │       └── strategies/      markdown-kb (BM25), vector-rag (HNSW), shared retrieve
+│   │       ├── strategies/      markdown-kb (BM25), vector-rag (HNSW), shared retrieve
+│   │       └── scripts/         import-raw: raw/*.{txt,html} → docs/*.md (+ tests)
 │   ├── web/                     React + Vite + Tailwind + assistant-ui on :5173
 │   │   └── src/lib/api.ts       typed Hono RPC client via hc<AppType>
 │   └── e2e/                     Playwright suite; auto-starts dev servers via webServer
 ├── packages/
 │   └── shared/                  Strategy, SourceInfo, ChatResult, IndexResult
-├── docs/                        sample Markdown KB (refund_policy, account_help, ...)
+├── raw/                         drop-zone for .txt / .html sources to import
+├── docs/                        canonical Markdown KB (refund_policy, account_help, ...)
 ├── .kb/                         generated indexes (gitignored)
 │   ├── index.json               BM25 sections + stats
 │   └── vector_index/            HNSW binary + metadata.json
@@ -226,6 +245,10 @@ Playwright covers the user-visible flows under `apps/e2e/tests/`:
 The Playwright config has a `webServer` block, so `npm run test:e2e` boots both
 `dev:server` and `dev:web` automatically (or reuses already-running instances
 locally).
+
+Unit tests use Node's built-in `node:test` (zero dependencies) and cover the
+pure raw→Markdown conversion helpers in `apps/server/src/scripts/import-raw.test.ts`.
+Run them with `npm run test:unit`.
 
 ---
 

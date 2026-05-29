@@ -129,6 +129,27 @@ npm run generate:wiki
 
 anchor 與索引器替每個標題指派的 slug 一致，所以連結在任何 Markdown 檢視器都能正確跳轉。
 
+### Answer filing（歸檔已審核的 Q&A）
+
+審核過 `/chat` 的答案、確認沒問題後，把它歸檔回知識庫。`POST /file-answer` 收下你核可的
+結果，寫成一份具來源引用的 Markdown 到 `wiki/answers/<slug>.md`，並保留引用：答案裡 inline
+的 `[file.md#section]` 標記會被改寫成連回 `docs/` 的連結，每個檢索到的來源也會附上分數列出。
+它同時重建 `wiki/answers/index.md`，讓歸檔的答案可以瀏覽。
+
+```bash
+# 審核 /chat 結果後，把核可的答案與來源歸檔
+curl -X POST http://localhost:8000/file-answer \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "How long do refunds take?",
+    "answer": "Refunds arrive in 5-7 business days [refund_policy.md#refund-timeline].",
+    "sources": [{"source":"refund_policy.md#refund-timeline","heading":"Refund Policy > Refund timeline","score":2.152,"content":"..."}]
+  }'
+# {"filed":true,"slug":"how-long-do-refunds-take","file":"wiki/answers/how-long-do-refunds-take.md"}
+```
+
+這個端點會原封不動保存你審核過的內容——不會重跑檢索或 LLM。
+
 ### Paraphrase 評測（檢索穩健度）
 
 `npm run eval` 會把一組精選的「改寫查詢」——同一個意圖、不同說法——丟進兩種策略的
@@ -187,7 +208,7 @@ npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 │   │   └── src/
 │   │       ├── app.ts           鏈式 Hono 建構器；匯出 AppType 供 RPC 使用
 │   │       ├── index.ts         啟動與伺服
-│   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare
+│   │       ├── routes/          /health, /build-index, /chat, /chat/stream, /compare, /file-answer
 │   │       ├── strategies/      markdown-kb (BM25), vector-rag (HNSW), 共用 retrieve
 │   │       ├── scripts/         import-raw（raw→docs）+ generate-wiki（索引→wiki）
 │   │       └── eval/            paraphrase：BM25 vs 向量的檢索穩健度評測
@@ -198,7 +219,7 @@ npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 │   └── shared/                  Strategy、SourceInfo、ChatResult、IndexResult 共用型別
 ├── raw/                         待匯入的 .txt / .html 原始檔放置區
 ├── docs/                        canonical Markdown 知識庫（refund_policy、account_help...）
-├── wiki/                        產生的可瀏覽索引（index.md）；已加入 .gitignore
+├── wiki/                        產生的內容（已 gitignore）：index.md + answers/（歸檔 Q&A）
 ├── .kb/                         產生的索引（已加入 .gitignore）
 │   ├── index.json               BM25 段落 + 統計
 │   └── vector_index/            HNSW 二進位檔 + metadata.json
@@ -214,6 +235,7 @@ npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
 | POST | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" }`        | `{ answer, sources, strategy }`                          |
 | POST | `/chat/stream`  | `{ query, strategy? }` 或 `{ messages: [...], strategy? }`    | AI SDK UI message stream（SSE）                          |
 | POST | `/compare`      | `{ query }`                                                  | `{ markdown_kb: {...}, vector_rag: {...} }`              |
+| POST | `/file-answer`  | `{ query, answer, sources?, strategy? }`                    | `{ filed, slug, file }`                                  |
 
 ### 檢索流程
 
@@ -287,7 +309,7 @@ Playwright 涵蓋可見流程，位於 `apps/e2e/tests/`：
 
 Playwright 設定檔的 `webServer` 區塊讓 `npm run test:e2e` 自動啟動 `dev:server` 與 `dev:web`，或於本地重複使用已啟動的實例。
 
-單元測試使用 Node 內建的 `node:test`（零依賴），涵蓋純函式：`apps/server/src/scripts/import-raw.test.ts` 的 raw→Markdown 轉換，以及 `apps/server/src/strategies/markdown-kb/wiki.test.ts` 的 wiki 索引產生。以 `npm run test:unit` 執行。
+單元測試使用 Node 內建的 `node:test`（零依賴），涵蓋純函式：`apps/server/src/scripts/import-raw.test.ts` 的 raw→Markdown 轉換、`apps/server/src/strategies/markdown-kb/wiki.test.ts` 的 wiki 索引產生，以及 `apps/server/src/strategies/markdown-kb/answer-filing.test.ts` 的答案歸檔（引用改寫、索引產生）。以 `npm run test:unit` 執行。
 
 ---
 

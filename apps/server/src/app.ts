@@ -5,6 +5,7 @@ import { indexRoute } from "./routes/index.js";
 import { chatRoute } from "./routes/chat.js";
 import { chatStreamRoute } from "./routes/chatStream.js";
 import { compareRoute } from "./routes/compare.js";
+import { fileAnswerRoute } from "./routes/fileAnswer.js";
 
 export const app = new Hono()
   .use("*", cors())
@@ -12,6 +13,7 @@ export const app = new Hono()
   .route("/", indexRoute)
   .route("/", chatRoute)
   .route("/", chatStreamRoute)
-  .route("/", compareRoute);
+  .route("/", compareRoute)
+  .route("/", fileAnswerRoute);
 
 export type AppType = typeof app;

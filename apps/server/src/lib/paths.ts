@@ -14,3 +14,5 @@ export const VECTOR_META_PATH = path.join(VECTOR_DIR, "metadata.json");
 export const VECTOR_HNSW_PATH = path.join(VECTOR_DIR, "hnsw.bin");
 export const WIKI_DIR = path.join(ROOT, "wiki");
 export const WIKI_INDEX_PATH = path.join(WIKI_DIR, "index.md");
+export const WIKI_ANSWERS_DIR = path.join(WIKI_DIR, "answers");
+export const WIKI_ANSWERS_INDEX_PATH = path.join(WIKI_ANSWERS_DIR, "index.md");

@@ -137,6 +137,28 @@ npm run generate:wiki
 The anchors match the slugs the indexer assigns to each heading, so the links resolve in any
 Markdown viewer.
 
+### Answer filing (persist reviewed Q&A)
+
+Once you've reviewed a `/chat` answer and it's good, file it back into the knowledge base.
+`POST /file-answer` takes the approved result and writes a source-grounded Markdown file to
+`wiki/answers/<slug>.md`, preserving citations: inline `[file.md#section]` markers in the
+answer become links back to `docs/`, and every retrieved source is listed with its score. It
+also regenerates `wiki/answers/index.md` so filed answers are browsable.
+
+```bash
+# Review a /chat result, then file the approved answer with its sources
+curl -X POST http://localhost:8000/file-answer \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "query": "How long do refunds take?",
+    "answer": "Refunds arrive in 5-7 business days [refund_policy.md#refund-timeline].",
+    "sources": [{"source":"refund_policy.md#refund-timeline","heading":"Refund Policy > Refund timeline","score":2.152,"content":"..."}]
+  }'
+# {"filed":true,"slug":"how-long-do-refunds-take","file":"wiki/answers/how-long-do-refunds-take.md"}
+```
+
+The endpoint persists exactly what you reviewed — it does not re-run retrieval or the LLM.
+
 ### Paraphrase eval (retrieval robustness)
 
 `npm run eval` runs a curated set of paraphrased queries — the *same* intent phrased
@@ -208,7 +230,7 @@ npm run test:e2e     # Playwright suite (auto-starts both dev servers)
 │   └── shared/                  Strategy, SourceInfo, ChatResult, IndexResult
 ├── raw/                         drop-zone for .txt / .html sources to import
 ├── docs/                        canonical Markdown KB (refund_policy, account_help, ...)
-├── wiki/                        generated browsable index (index.md); gitignored
+├── wiki/                        generated, gitignored: index.md + answers/ (filed Q&A)
 ├── .kb/                         generated indexes (gitignored)
 │   ├── index.json               BM25 sections + stats
 │   └── vector_index/            HNSW binary + metadata.json
@@ -224,6 +246,7 @@ npm run test:e2e     # Playwright suite (auto-starts both dev servers)
 | POST   | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" }`         | `{ answer, sources, strategy }`                           |
 | POST   | `/chat/stream`  | `{ query, strategy? }` or `{ messages: [...], strategy? }`    | AI SDK UI message stream (SSE)                            |
 | POST   | `/compare`      | `{ query }`                                                   | `{ markdown_kb: {...}, vector_rag: {...} }`               |
+| POST   | `/file-answer`  | `{ query, answer, sources?, strategy? }`                     | `{ filed, slug, file }`                                   |
 
 ### Retrieval pipeline
 
@@ -314,9 +337,11 @@ The Playwright config has a `webServer` block, so `npm run test:e2e` boots both
 locally).
 
 Unit tests use Node's built-in `node:test` (zero dependencies) and cover the pure
-helpers: raw→Markdown conversion in `apps/server/src/scripts/import-raw.test.ts` and
-wiki-index rendering in `apps/server/src/strategies/markdown-kb/wiki.test.ts`. Run them
-with `npm run test:unit`.
+helpers: raw→Markdown conversion in `apps/server/src/scripts/import-raw.test.ts`,
+wiki-index rendering in `apps/server/src/strategies/markdown-kb/wiki.test.ts`, and
+answer filing (citation rewriting, index rendering) in
+`apps/server/src/strategies/markdown-kb/answer-filing.test.ts`. Run them with
+`npm run test:unit`.
 
 ---
 

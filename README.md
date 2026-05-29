@@ -193,6 +193,35 @@ Legend: ✅ expected is top-1, 🔸 expected in top-3, ❌ wrong section. The pr
 in [`apps/server/src/eval/paraphrase.ts`](apps/server/src/eval/paraphrase.ts) — add
 intents and paraphrases there.
 
+### Conversation memory (follow-up questions)
+
+`/chat/stream` accepts the full `messages` array, so a follow-up is read in the context of
+the conversation. Before retrieval, the server rewrites the latest question into a standalone
+query using the recent turns — resolving pronouns and implied subjects ("How do I start
+**one**?" → "How do I start a refund?") — and then retrieves with the rewritten query. Memory
+only shapes *what gets retrieved*; the answer is still grounded solely in the retrieved
+sources and follows the same citation rules.
+
+The rewrite runs only when there is prior history — the first turn is passed through
+untouched — and it fails open: if the rewrite call errors, the original question is used, so
+chat never breaks. When the question is rewritten, the stream emits an extra `data-rewrite`
+part and the UI shows it as an "Interpreted as …" line above the sources panel.
+
+```bash
+curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d '{
+  "strategy": "markdown_kb",
+  "messages": [
+    {"role":"user","parts":[{"type":"text","text":"How long do refunds take?"}]},
+    {"role":"assistant","parts":[{"type":"text","text":"Refunds take 5-7 business days [refund_policy.md#refund-timeline]."}]},
+    {"role":"user","parts":[{"type":"text","text":"How do I start one?"}]}
+  ]
+}'
+# ... data: {"type":"data-rewrite","id":"rewrite","data":{"original":"How do I start one?","rewritten":"How do I start a refund?"}}
+```
+
+The rewrite needs `OPENAI_API_KEY` (one small extra call per follow-up); the first turn skips
+it, so single-turn behavior is unchanged.
+
 ### Scripts
 
 ```bash
@@ -284,7 +313,8 @@ data: {"type":"finish"}
 Sources are streamed **before** any answer token so the UI can render the sources
 panel while the model is still generating. The implementation uses
 `createUIMessageStream` to inject the `data-sources` part, then `writer.merge`'s the
-output of `streamText().toUIMessageStream({ messageMetadata, onFinish })`.
+output of `streamText().toUIMessageStream({ messageMetadata, onFinish })`. On a follow-up
+turn it also injects a `data-rewrite` part (see [Conversation memory](#conversation-memory-follow-up-questions)).
 
 ### End-to-end type safety
 
@@ -331,6 +361,8 @@ Playwright covers the user-visible flows under `apps/e2e/tests/`:
   counts.
 - `out-of-scope` — restaurant question hits the "cannot confirm" fallback with an
   empty sources panel.
+- `chat-followup` — a follow-up ("How do I start one?") is resolved through conversation
+  memory; asserts the "Interpreted as" rewrite and the refund sources.
 
 The Playwright config has a `webServer` block, so `npm run test:e2e` boots both
 `dev:server` and `dev:web` automatically (or reuses already-running instances

@@ -182,6 +182,31 @@ Summary (out of 15 paraphrases)
 [`apps/server/src/eval/paraphrase.ts`](apps/server/src/eval/paraphrase.ts)，可在此
 新增意圖與改寫句。
 
+### 對話記憶（追問）
+
+`/chat/stream` 會接收完整的 `messages` 陣列，因此追問會在對話脈絡下被解讀。檢索之前，
+伺服器會用最近幾輪對話把最新的問題改寫成「獨立完整的查詢」——解析代名詞與省略的主詞
+（「How do I start **one**?」→「How do I start a refund?」）——再用改寫後的查詢去檢索。
+記憶只影響「檢索什麼」；回答仍只 ground 在檢索到的來源，並維持相同的引用規則。
+
+改寫只在「有前文」時才執行——第一輪原樣放行——而且採 fail-open：改寫呼叫若出錯就退回
+原問題，聊天永遠不會因此中斷。當問題被改寫時，串流會多送一個 `data-rewrite` 區塊，
+UI 會在來源面板上方顯示為「Interpreted as …」一行。
+
+```bash
+curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d '{
+  "strategy": "markdown_kb",
+  "messages": [
+    {"role":"user","parts":[{"type":"text","text":"How long do refunds take?"}]},
+    {"role":"assistant","parts":[{"type":"text","text":"Refunds take 5-7 business days [refund_policy.md#refund-timeline]."}]},
+    {"role":"user","parts":[{"type":"text","text":"How do I start one?"}]}
+  ]
+}'
+# ... data: {"type":"data-rewrite","id":"rewrite","data":{"original":"How do I start one?","rewritten":"How do I start a refund?"}}
+```
+
+改寫需要 `OPENAI_API_KEY`（每次追問多一次小型呼叫）；第一輪會略過，因此單輪行為維持不變。
+
 ### 常用腳本
 
 ```bash
@@ -263,7 +288,7 @@ data: {"type":"finish"}
 ```
 
 來源會在回答文字之前先串流，讓 UI 可立即顯示來源面板，避免看起來卡住。
-實作上使用 `createUIMessageStream` 先插入 `data-sources` 區塊，再將 `streamText().toUIMessageStream({ messageMetadata, onFinish })` 的輸出合併。
+實作上使用 `createUIMessageStream` 先插入 `data-sources` 區塊，再將 `streamText().toUIMessageStream({ messageMetadata, onFinish })` 的輸出合併。追問時還會額外插入 `data-rewrite` 區塊（見[對話記憶](#對話記憶追問)）。
 
 ### 端對端型別安全
 
@@ -306,6 +331,7 @@ Playwright 涵蓋可見流程，位於 `apps/e2e/tests/`：
 - `compare` —— `/compare` 頁面呈現兩欄。
 - `index-management` —— Build Index 按鈕顯示「Indexing…」並呈現統計。
 - `out-of-scope` —— 餐廳問題觸發「無法確認」並清空來源面板。
+- `chat-followup` —— 追問（「How do I start one?」）透過對話記憶解讀；驗證「Interpreted as」改寫與退款來源。
 
 Playwright 設定檔的 `webServer` 區塊讓 `npm run test:e2e` 自動啟動 `dev:server` 與 `dev:web`，或於本地重複使用已啟動的實例。
 

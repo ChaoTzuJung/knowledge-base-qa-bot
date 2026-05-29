@@ -18,10 +18,10 @@ test.describe("Index management", () => {
     await expect(button).toHaveText("Indexing…");
 
     // 2. Wait for the request to complete
-    // expect: a result card appears containing the text "Markdown KB: 3 files, 12 sections"
-    await expect(page.getByText("Markdown KB: 3 files, 12 sections")).toBeVisible();
+    // expect: a result card appears containing the text "Markdown KB: 5 files, 17 sections"
+    await expect(page.getByText("Markdown KB: 5 files, 17 sections")).toBeVisible();
 
-    // expect: the same card contains the text "Vector: 3 files, 9 chunks"
-    await expect(page.getByText("Vector: 3 files, 9 chunks")).toBeVisible();
+    // expect: the same card contains the text "Vector: 5 files, 14 chunks"
+    await expect(page.getByText("Vector: 5 files, 14 chunks")).toBeVisible();
   });
 });

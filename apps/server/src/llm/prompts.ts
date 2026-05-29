@@ -9,6 +9,15 @@ Rules:
 4. Do not use any outside knowledge. Do not guess.
 5. Keep answers concise (1-3 sentences) and grounded.`;
 
+export const CONTEXTUALIZE_SYSTEM_PROMPT = `You rewrite a follow-up question into a standalone question using the chat history.
+
+Rules:
+1. Resolve pronouns and implicit references (it, that, one, "the previous", etc.) using the chat history so the question stands on its own.
+2. If the question is already standalone, return it unchanged.
+3. Output ONLY the rewritten question. No preamble, no quotes, no explanation.
+4. Do NOT answer the question.
+5. Do NOT add any information that is not implied by the chat history.`;
+
 export interface ContextSection {
   id: string;
   heading_path: string[];

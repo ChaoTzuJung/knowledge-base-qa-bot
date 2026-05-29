@@ -4,6 +4,7 @@ import { Thread } from "@/components/Thread";
 import { StrategyPicker } from "@/components/StrategyPicker";
 import { IndexButton } from "@/components/IndexButton";
 import { SourcesPanel } from "@/components/SourcesPanel";
+import { InterpretedQuery } from "@/components/InterpretedQuery";
 import { CompareView } from "@/components/CompareView";
 import { useKbRuntime } from "@/runtime";
 import type { Strategy } from "@kb/shared";
@@ -51,6 +52,7 @@ export default function App() {
             <aside className="overflow-y-auto border-l border-border bg-muted/20 p-4 space-y-4">
               <IndexButton />
               <StrategyPicker value={strategy} onChange={setStrategy} />
+              <InterpretedQuery />
               <SourcesPanel />
             </aside>
           </div>

@@ -1,6 +1,17 @@
+import { memo } from "react";
 import { ComposerPrimitive, MessagePrimitive, ThreadPrimitive } from "@assistant-ui/react";
+import { MarkdownTextPrimitive } from "@assistant-ui/react-markdown";
 import { SendHorizontalIcon } from "lucide-react";
+import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
+
+// Render assistant text as Markdown (bold, lists, etc.) instead of showing raw
+// "**" markers. memo() mirrors assistant-ui's canonical markdown-text component so
+// streaming re-renders don't re-parse already-rendered messages. Styling comes from
+// the `prose` container; we skip the registry's code-block components since KB
+// answers are short prose without code blocks.
+const MarkdownTextImpl = () => <MarkdownTextPrimitive remarkPlugins={[remarkGfm]} />;
+const MarkdownText = memo(MarkdownTextImpl);
 
 const WELCOME_SUGGESTIONS = [
   "How long do refunds take?",
@@ -77,8 +88,8 @@ function AssistantMessage() {
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border bg-card text-xs font-semibold">
           A
         </div>
-        <div className="prose prose-sm flex-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
-          <MessagePrimitive.Parts />
+        <div className="prose prose-sm max-w-none flex-1 break-words text-sm leading-relaxed text-foreground">
+          <MessagePrimitive.Parts components={{ Text: MarkdownText }} />
         </div>
       </div>
     </MessagePrimitive.Root>

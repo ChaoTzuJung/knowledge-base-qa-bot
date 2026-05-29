@@ -24,3 +24,8 @@ export interface SourcesPayload {
   strategy: Strategy;
   sources: SourceInfo[];
 }
+
+export interface RewritePayload {
+  original: string;
+  rewritten: string;
+}

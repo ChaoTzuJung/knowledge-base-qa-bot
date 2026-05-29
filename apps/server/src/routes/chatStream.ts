@@ -9,6 +9,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { OPENAI_MODEL } from "../env.js";
+import { contextualizeQuery, type Turn } from "../llm/contextualize.js";
 import { SYSTEM_PROMPT } from "../llm/prompts.js";
 import { retrieve } from "../strategies/query.js";
 
@@ -54,6 +55,35 @@ function extractQuery(body: StreamBodyType): string {
   return "";
 }
 
+function messageText(m: z.infer<typeof UIMessageSchema>): string {
+  const candidates: MessagePartType[] = m.parts ?? (Array.isArray(m.content) ? m.content : []);
+  const texts = candidates.map(partText).filter((t): t is string => t !== null);
+  if (texts.length > 0) return texts.join(" ");
+  if (typeof m.content === "string") return m.content;
+  return "";
+}
+
+// Prior conversation turns, EXCLUDING the final user message (the current question).
+// Used as short memory so the follow-up can be rewritten into a standalone query.
+function extractHistory(body: StreamBodyType): Turn[] {
+  const msgs = body.messages ?? [];
+  let lastUserIdx = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i]?.role === "user") {
+      lastUserIdx = i;
+      break;
+    }
+  }
+  if (lastUserIdx <= 0) return [];
+  const turns: Turn[] = [];
+  for (const m of msgs.slice(0, lastUserIdx)) {
+    if (m.role !== "user" && m.role !== "assistant") continue;
+    const text = messageText(m).trim();
+    if (text) turns.push({ role: m.role, text });
+  }
+  return turns;
+}
+
 function writeText(writer: UIMessageStreamWriter, id: string, text: string) {
   writer.write({ type: "text-start", id });
   writer.write({ type: "text-delta", id, delta: text });
@@ -71,8 +101,14 @@ export const chatStreamRoute = new Hono().post(
   async (c) => {
     const body = c.req.valid("json");
     const strategy = body.strategy ?? "markdown_kb";
-    const query = extractQuery(body);
-    if (!query) return c.json({ error: "Empty query" }, 400);
+    const question = extractQuery(body);
+    if (!question) return c.json({ error: "Empty query" }, 400);
+
+    // Conversation memory: rewrite the follow-up into a standalone query using
+    // recent turns, then retrieve with that. Answer generation stays grounded on
+    // the retrieved sources below.
+    const history = extractHistory(body);
+    const query = await contextualizeQuery(history, question);
 
     const retrieved = await retrieve(query, strategy);
 
@@ -86,6 +122,14 @@ export const chatStreamRoute = new Hono().post(
             sources: retrieved.sources,
           },
         });
+
+        if (query !== question) {
+          writer.write({
+            type: "data-rewrite",
+            id: "rewrite",
+            data: { original: question, rewritten: query },
+          });
+        }
 
         if (retrieved.notIndexed) {
           const which = strategy === "markdown_kb" ? "Markdown KB" : "Vector";

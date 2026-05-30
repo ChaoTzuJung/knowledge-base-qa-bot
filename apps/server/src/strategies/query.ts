@@ -1,5 +1,6 @@
-import type { ChatResult, Section, SourceInfo, Strategy } from "../lib/types.js";
+import type { Chunk, ChatResult, Section, SourceInfo, Strategy } from "../lib/types.js";
 import { generateAnswer } from "../llm/answer.js";
+import { verifyGrounding } from "../llm/grounding.js";
 import { buildPrompt, sectionsToContext } from "../llm/prompts.js";
 import { BM25_THRESHOLD, search as bm25Search } from "./markdown-kb/bm25.js";
 import { isIndexed as isMarkdownIndexed, state as markdownState } from "./markdown-kb/indexer.js";
@@ -8,9 +9,13 @@ import { reciprocalRankFusion } from "./rrf.js";
 import { isVectorIndexed, vectorState } from "./vector-rag/indexer.js";
 import { SIMILARITY_THRESHOLD, vectorSearch } from "./vector-rag/retriever.js";
 
-export interface RetrievedContext {
-  prompt: string;
+interface RetrieveResult {
+  ok: boolean;
+  prompt?: string;
+  /** Full retrieved context (untruncated section text), used for grounding verification. */
+  context?: string;
   sources: SourceInfo[];
+  notIndexed: boolean;
 }
 
 function toSources(
@@ -30,23 +35,33 @@ function parentSectionId(chunkId: string): string {
   return chunkId.split("::")[0];
 }
 
-export async function retrieve(
+/** Assemble the successful retrieval result: prompt for the answer LLM, full
+ *  context for the grounding verifier, and truncated source previews for the UI. */
+function buildRetrieved(
   query: string,
-  strategy: Strategy,
-): Promise<{ ok: boolean; prompt?: string; sources: SourceInfo[]; notIndexed: boolean }> {
+  items: Array<Section | Chunk>,
+  scores: number[],
+): RetrieveResult {
+  const ctx = sectionsToContext(items, scores);
+  return {
+    ok: true,
+    prompt: buildPrompt(query, ctx),
+    context: ctx.map((s) => `[${s.id}]\n${s.content}`).join("\n---\n"),
+    sources: toSources(items, scores),
+    notIndexed: false,
+  };
+}
+
+export async function retrieve(query: string, strategy: Strategy): Promise<RetrieveResult> {
   if (strategy === "markdown_kb") {
     if (!isMarkdownIndexed()) return { ok: false, sources: [], notIndexed: true };
     const ranked = bm25Search(query, 3);
     if (ranked.length === 0) return { ok: false, sources: [], notIndexed: false };
-    const items = ranked.map((r) => r.section);
-    const scores = ranked.map((r) => r.score);
-    const ctx = sectionsToContext(items, scores);
-    return {
-      ok: true,
-      prompt: buildPrompt(query, ctx),
-      sources: toSources(items, scores),
-      notIndexed: false,
-    };
+    return buildRetrieved(
+      query,
+      ranked.map((r) => r.section),
+      ranked.map((r) => r.score),
+    );
   }
 
   if (strategy === "llm_index") {
@@ -59,14 +74,11 @@ export async function retrieve(
 
     // No similarity score for the LLM router; expose the 1-based pick order, which
     // the UI renders as "rank N" instead of a misleading decimal score.
-    const scores = selected.map((_, i) => i + 1);
-    const ctx = sectionsToContext(selected, scores);
-    return {
-      ok: true,
-      prompt: buildPrompt(query, ctx),
-      sources: toSources(selected, scores),
-      notIndexed: false,
-    };
+    return buildRetrieved(
+      query,
+      selected,
+      selected.map((_, i) => i + 1),
+    );
   }
 
   if (strategy === "hybrid") {
@@ -99,34 +111,27 @@ export async function retrieve(
       .filter((r): r is { section: Section; score: number } => r.section !== undefined);
     if (ranked.length === 0) return { ok: false, sources: [], notIndexed: false };
 
-    const items = ranked.map((r) => r.section);
-    const scores = ranked.map((r) => r.score);
-    const ctx = sectionsToContext(items, scores);
-    return {
-      ok: true,
-      prompt: buildPrompt(query, ctx),
-      sources: toSources(items, scores),
-      notIndexed: false,
-    };
+    return buildRetrieved(
+      query,
+      ranked.map((r) => r.section),
+      ranked.map((r) => r.score),
+    );
   }
 
   if (!isVectorIndexed()) return { ok: false, sources: [], notIndexed: true };
   const hits = await vectorSearch(query, 3);
   if (hits.length === 0) return { ok: false, sources: [], notIndexed: false };
-  const items = hits.map((h) => h.chunk);
-  const scores = hits.map((h) => h.score);
-  const ctx = sectionsToContext(items, scores);
-  return {
-    ok: true,
-    prompt: buildPrompt(query, ctx),
-    sources: toSources(items, scores),
-    notIndexed: false,
-  };
+  return buildRetrieved(
+    query,
+    hits.map((h) => h.chunk),
+    hits.map((h) => h.score),
+  );
 }
 
 export async function answerQuery(
   query: string,
   strategy: Strategy,
+  opts: { verify?: boolean } = {},
 ): Promise<ChatResult> {
   const r = await retrieve(query, strategy);
   if (r.notIndexed) {
@@ -145,7 +150,8 @@ export async function answerQuery(
     return { answer: "I cannot confirm from the knowledge base.", sources: [] };
   }
   const answer = await generateAnswer(r.prompt);
-  return { answer, sources: r.sources };
+  const grounding = opts.verify ? await verifyGrounding(answer, r.context ?? "") : undefined;
+  return { answer, sources: r.sources, grounding };
 }
 
 export function indexedStatus() {

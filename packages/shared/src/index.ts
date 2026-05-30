@@ -7,9 +7,17 @@ export interface SourceInfo {
   content: string;
 }
 
+/** Result of the post-answer grounding check: is every claim supported by the
+ *  retrieved sources, and which claims (if any) were not. */
+export interface GroundingVerdict {
+  grounded: boolean;
+  unsupported: string[];
+}
+
 export interface ChatResult {
   answer: string;
   sources: SourceInfo[];
+  grounding?: GroundingVerdict;
 }
 
 export interface IndexResult {

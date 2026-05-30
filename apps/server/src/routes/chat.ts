@@ -25,7 +25,7 @@ export const chatRoute = new Hono().post(
   async (c) => {
     const { query, strategy: maybeStrategy } = c.req.valid("json");
     const strategy = maybeStrategy ?? "hybrid";
-    const result = await answerQuery(query, strategy);
+    const result = await answerQuery(query, strategy, { verify: true });
     return c.json({ ...result, strategy });
   },
 );

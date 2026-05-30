@@ -10,6 +10,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { OPENAI_MODEL } from "../env.js";
 import { contextualizeQuery, type Turn } from "../llm/contextualize.js";
+import { verifyGrounding } from "../llm/grounding.js";
 import { SYSTEM_PROMPT } from "../llm/prompts.js";
 import { retrieve } from "../strategies/query.js";
 
@@ -167,6 +168,13 @@ export const chatStreamRoute = new Hono().post(
             },
           }),
         );
+
+        // Once the answer is complete, verify it against the retrieved context and
+        // emit a trailing grounding verdict. Awaiting result.text here keeps the
+        // stream open until the data-grounding part is written.
+        const fullText = await result.text;
+        const grounding = await verifyGrounding(fullText, retrieved.context ?? "");
+        writer.write({ type: "data-grounding", id: "grounding", data: grounding });
       },
       onError: (err) => {
         console.error("[/chat/stream] error:", err);

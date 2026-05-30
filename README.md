@@ -37,6 +37,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 - **Incremental indexing** — `/build-index` re-embeds only the files whose content changed (per-file SHA-256), reusing the existing vectors for the rest.
 - **Grounding verifier** — after answering, a second LLM pass checks each claim against the retrieved sources and flags anything unsupported ([why](#why-explicit-i-cannot-confirm)).
 - **Injection guard & citation safety** — role-hijack / prompt-leak queries are refused before retrieval, and answer citations are validated against the retrieved set (hallucinated ones stripped, missing ones backfilled).
+- **Dream memory consolidation** — a self-improving loop: repeatedly-asked, grounded questions are clustered and distilled into canonical FAQ entries that get promoted into the indexed KB ([details](#dream-memory-consolidation-self-improving-retrieval)).
 - **End-to-end type safety** (Hono RPC), a [paraphrase eval harness](#paraphrase-eval-retrieval-robustness), and Playwright + unit [tests](#tests).
 
 **Contents:** [How to use](#1--how-to-use) · [Advanced usage](#2--advanced-usage) · [How it works](#3--how-it-works) · [Design decisions](#4--design-decisions)
@@ -253,6 +254,28 @@ curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d
 
 The rewrite needs `OPENAI_API_KEY` (one small extra call per follow-up); the first turn skips
 it, so single-turn behavior is unchanged.
+
+### Dream memory consolidation (self-improving retrieval)
+
+Every answered turn is logged to `.kb/dream/turns.jsonl`, tagged with the
+[grounding verdict](#features) (`VALID` / `DEFAULT` / `REJECTED`). `POST /dream` (or
+`npm run dream`) then runs a consolidation pass: it embeds the **grounded, repeatedly-asked**
+questions, clusters paraphrases by cosine similarity (≥ 0.85, single-link), keeps clusters
+asked **≥ 3 times**, and distills each into one canonical Q&A. The result is promoted into
+`docs/_consolidated.md` (tagged `source_type: faq`) and the indexes are rebuilt — so the next
+time that question is asked, it hits a first-class, retrievable KB section instead of being
+recomputed from scratch. Frequently-asked, vetted answers literally become part of the corpus.
+
+```bash
+curl -X POST http://localhost:8000/dream
+# {"scanned":42,"valid":31,"clusters":3,"promoted":[{"slug":"how-long-do-refunds-take","question":"How long do refunds take?","occurrences":8}],"skipped":0,"reindexed":{"sections":19,"chunks":16}}
+```
+
+It is **idempotent** — `state.json` records each promoted cluster's fingerprint, so a re-run
+with no new clusters promotes nothing and leaves the doc untouched — and **fail-open**: a
+cluster whose distillation errors or returns malformed JSON is skipped, never written. Needs
+`OPENAI_API_KEY` (embeddings + one distill call per new cluster). Logged queries stay local
+to `.kb/`.
 
 ---
 

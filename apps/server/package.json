@@ -12,6 +12,7 @@
     "start": "node dist/index.js",
     "import:raw": "tsx src/scripts/import-raw.ts",
     "generate:wiki": "tsx src/scripts/generate-wiki.ts",
+    "dream": "tsx src/scripts/run-dream.ts",
     "eval": "tsx src/eval/paraphrase.ts",
     "test": "tsx --test \"src/**/*.test.ts\""
   },

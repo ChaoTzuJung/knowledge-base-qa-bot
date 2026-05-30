@@ -33,6 +33,7 @@ npm run dev:web      # 終端 2 —— Vite 啟動於 :5173（反向代理至 :8
 - **增量索引** —— `/build-index` 只對內容有變動的檔案重新嵌入（逐檔 SHA-256），其餘重用既有向量。
 - **Grounding 驗證器** —— 回答後再用一次 LLM 逐一比對答案的主張與檢索來源，標出沒有依據的部分（[原因](#為何明確我無法確認)）。
 - **Injection 防護 & 引用防呆** —— 角色劫持 / 洩漏 prompt 的查詢在檢索前就被擋下；答案的引用也會跟檢索結果核對（亂編的剝除、缺漏的補回）。
+- **Dream 記憶固化** —— 自我改善迴圈：把被重複問到、且有依據的問題分群並 distill 成 canonical FAQ，升級成可檢索的一級 KB 內容（[細節](#dream-記憶固化自我改善的檢索)）。
 - **端對端型別安全**（Hono RPC）、[paraphrase 評測](#paraphrase-評測檢索穩健度)與 Playwright + 單元[測試](#測試)。
 
 **目錄：** [如何使用](#1--如何使用) · [進階使用](#2--進階使用) · [運作原理](#3--運作原理) · [設計決策](#4--設計決策)
@@ -238,6 +239,17 @@ curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d
 ```
 
 改寫需要 `OPENAI_API_KEY`（每次追問多一次小型呼叫）；第一輪會略過，因此單輪行為維持不變。
+
+### Dream 記憶固化（自我改善的檢索）
+
+每次回答都會記錄到 `.kb/dream/turns.jsonl`，並用 [grounding 判定](#功能)標記（`VALID` / `DEFAULT` / `REJECTED`）。`POST /dream`（或 `npm run dream`）會跑一次固化：把**有依據、被重複問到**的問題嵌入向量，用 cosine 相似度（≥ 0.85，single-link）把同義問法分群，留下**被問 ≥ 3 次**的群，各 distill 成一條 canonical Q&A，升級寫進 `docs/_consolidated.md`（標 `source_type: faq`）並重建索引——於是下次再問到同樣問題，會直接命中一段一級、可檢索的 KB，而不是重新從零算一次。常被問到、且已驗證的答案，就這樣沉澱進語料。
+
+```bash
+curl -X POST http://localhost:8000/dream
+# {"scanned":42,"valid":31,"clusters":3,"promoted":[{"slug":"how-long-do-refunds-take","question":"How long do refunds take?","occurrences":8}],"skipped":0,"reindexed":{"sections":19,"chunks":16}}
+```
+
+它是 **idempotent** 的——`state.json` 記下每個已升級群的 fingerprint，所以沒有新群時重跑不會重複塞、文件原封不動——也是 **fail-open**：distill 出錯或回傳格式錯誤的群會被跳過、絕不寫入。需要 `OPENAI_API_KEY`（嵌入 + 每個新群一次 distill 呼叫）。記錄的查詢只留在本地 `.kb/`。
 
 ---
 

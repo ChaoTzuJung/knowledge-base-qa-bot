@@ -37,3 +37,14 @@ export interface RewritePayload {
   original: string;
   rewritten: string;
 }
+
+/** A user's rating of an answer, sent to POST /feedback. For a "down" rating,
+ *  `expected_source` is the section the answer SHOULD have used (a source id),
+ *  or `null` to mean "it should have refused". */
+export interface FeedbackInput {
+  rating: "up" | "down";
+  query: string;
+  answer: string;
+  sources: SourceInfo[];
+  expected_source?: string | null;
+}

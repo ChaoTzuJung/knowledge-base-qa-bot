@@ -5,6 +5,7 @@ export type {
   GroundingVerdict,
   IndexResult,
   SourcesPayload,
+  FeedbackInput,
 } from "@kb/shared";
 
 export interface Section {

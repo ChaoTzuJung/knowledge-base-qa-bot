@@ -15,6 +15,7 @@
     "dream": "tsx src/scripts/run-dream.ts",
     "eval": "tsx src/eval/paraphrase.ts",
     "eval:answer": "tsx src/eval/answer-eval.ts",
+    "eval:from-feedback": "tsx src/scripts/eval-from-feedback.ts",
     "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {

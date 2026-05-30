@@ -13,7 +13,7 @@
 import { answerQuery } from "../strategies/query.js";
 import { isIndexed, loadIndexJson } from "../strategies/markdown-kb/indexer.js";
 import { isVectorIndexed, loadVectorIndex } from "../strategies/vector-rag/indexer.js";
-import { CASES } from "./cases.js";
+import { loadAllCases } from "./cases.js";
 import {
   baseId,
   computeCaseMetrics,
@@ -58,14 +58,15 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const total = CASES.reduce((n, c) => n + c.paraphrases.length, 0);
-  console.log(`\nAnswer-level eval — strategy=${STRATEGY}, ${CASES.length} intents, ${total} paraphrases\n`);
+  const cases = loadAllCases();
+  const total = cases.reduce((n, c) => n + c.paraphrases.length, 0);
+  console.log(`\nAnswer-level eval — strategy=${STRATEGY}, ${cases.length} intents, ${total} paraphrases\n`);
 
   const all: CaseMetrics[] = [];
   const answerOnly: CaseMetrics[] = [];
   const refusalOnly: CaseMetrics[] = [];
 
-  for (const c of CASES) {
+  for (const c of cases) {
     const target = c.expectedDecision === "answer" ? c.expected.join(", ") : "(refuse)";
     console.log(`▸ ${c.intent}   expect: ${c.expectedDecision} / ${target}`);
 

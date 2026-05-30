@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import type { Decision } from "./metrics.js";
 
 export interface EvalCase {
@@ -62,3 +64,21 @@ export const CASES: EvalCase[] = [
     paraphrases: ["What's the weather tomorrow?"],
   },
 ];
+
+/** Path to the generated regression cases produced by `npm run eval:from-feedback`. */
+const GENERATED_PATH = fileURLToPath(new URL("./cases.gen.json", import.meta.url));
+
+/** Read the feedback-generated regression cases. Returns [] when absent/malformed. */
+export function loadGeneratedCases(): EvalCase[] {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(GENERATED_PATH, "utf-8"));
+    return Array.isArray(parsed) ? (parsed as EvalCase[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** The curated cases plus any feedback-generated regression cases. */
+export function loadAllCases(): EvalCase[] {
+  return [...CASES, ...loadGeneratedCases()];
+}

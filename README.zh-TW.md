@@ -34,6 +34,7 @@ npm run dev:web      # 終端 2 —— Vite 啟動於 :5173（反向代理至 :8
 - **Grounding 驗證器** —— 回答後再用一次 LLM 逐一比對答案的主張與檢索來源，標出沒有依據的部分（[原因](#為何明確我無法確認)）。
 - **Injection 防護 & 引用防呆** —— 角色劫持 / 洩漏 prompt 的查詢在檢索前就被擋下；答案的引用也會跟檢索結果核對（亂編的剝除、缺漏的補回）。
 - **Dream 記憶固化** —— 自我改善迴圈：把被重複問到、且有依據的問題分群並 distill 成 canonical FAQ，升級成可檢索的一級 KB 內容（[細節](#dream-記憶固化自我改善的檢索)）。
+- **回饋 → 評測迴圈** —— 對答案按 👎 並挑出「它應該用的來源」，這個 miss 就變成一條永久的答案層級回歸案例（[細節](#回饋--評測迴圈)）。
 - **端對端型別安全**（Hono RPC）、[paraphrase 評測](#paraphrase-評測檢索穩健度)與 Playwright + 單元[測試](#測試)。
 
 **目錄：** [如何使用](#1--如何使用) · [進階使用](#2--進階使用) · [運作原理](#3--運作原理) · [設計決策](#4--設計決策)
@@ -113,6 +114,7 @@ npm run import:raw   # 將 raw/*.txt|*.html 正規化成 docs/*.md
 npm run generate:wiki # 從 .kb/index.json 重新產生 wiki/index.md
 npm run eval         # paraphrase 檢索評測（BM25 vs 向量）
 npm run eval:answer  # 答案層級評測：引用、決策、grounding（需 OPENAI_API_KEY）
+npm run eval:from-feedback # 把 👎 回饋轉成回歸評測案例
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test 單元測試（raw→Markdown 轉換函式）
 npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
@@ -242,6 +244,16 @@ Summary
 需要 `OPENAI_API_KEY`（每題都跑 `answerQuery`）。題庫在
 [`apps/server/src/eval/cases.ts`](apps/server/src/eval/cases.ts)；指標計算是純函式，單元測試在
 [`metrics.test.ts`](apps/server/src/eval/metrics.test.ts)。
+
+### 回饋 → 評測迴圈
+
+把「生產→回歸」迴圈閉環：在 UI 對答案評分，👎 就變成一條新的評測案例。側欄的**回饋面板**針對最新一答顯示 👍 / 👎；按 👎 會跳出一個挑「這次檢索到的來源」的選單（外加「都不對 —— 應該拒答」），讓你記下**答案應該用哪個來源**。`POST /feedback` 把評分 append 到 `.kb/feedback/feedback.jsonl`。
+
+```bash
+npm run eval:from-feedback   # 讀回饋 log → 寫出 eval/cases.gen.json
+```
+
+`eval:from-feedback` 把每個 👎 轉成回歸案例（`expected_source` → 期望該段落的 "answer" 案例；「應該拒答」→ `cannot_confirm` 案例），並依問題去重。`npm run eval:answer` 會把 `cases.gen.json` 跟精選案例一起載入，於是真實的 miss 之後每次都會被評分。已提交的語料一開始是空的；回饋 log 只留在本地 `.kb/`。
 
 ### 對話記憶（追問）
 

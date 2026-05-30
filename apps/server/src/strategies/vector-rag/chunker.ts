@@ -17,6 +17,7 @@ export function chunkFile(file: string, source: string): Omit<Chunk, "label">[] 
         heading: section.heading,
         heading_path: section.heading_path,
         content: section.content,
+        priority: section.priority,
       });
       continue;
     }
@@ -31,6 +32,7 @@ export function chunkFile(file: string, source: string): Omit<Chunk, "label">[] 
         heading: section.heading,
         heading_path: section.heading_path,
         content: text,
+        priority: section.priority,
       });
       partIdx += 1;
       if (end === section.content.length) break;

@@ -9,6 +9,7 @@ import {
   VECTOR_META_PATH,
 } from "../../lib/paths.js";
 import type { Chunk, VectorMetadata } from "../../lib/types.js";
+import { DEFAULT_PRIORITY } from "../authority.js";
 import { EMBEDDING_DIM, OPENAI_EMBEDDING_MODEL } from "../../env.js";
 import { getOpenAI } from "../../llm/client.js";
 import { chunkFile } from "./chunker.js";
@@ -145,7 +146,14 @@ export async function buildVectorIndex(): Promise<{
         for (const oc of oldChunksByFile.get(file)!) {
           const vector = prior.index.getPoint(oc.label);
           reused.push({
-            chunk: { id: oc.id, file: oc.file, heading: oc.heading, heading_path: oc.heading_path, content: oc.content },
+            chunk: {
+              id: oc.id,
+              file: oc.file,
+              heading: oc.heading,
+              heading_path: oc.heading_path,
+              content: oc.content,
+              priority: oc.priority ?? DEFAULT_PRIORITY,
+            },
             vector,
           });
         }

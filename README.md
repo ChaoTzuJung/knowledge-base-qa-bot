@@ -33,6 +33,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 - **Honest "I cannot confirm"** instead of hallucinating when nothing matches ([why](#why-explicit-i-cannot-confirm)).
 - **Conversation memory** that rewrites follow-ups into standalone queries ([details](#conversation-memory-follow-up-questions)).
 - **Persist & browse** — [file reviewed answers](#answer-filing-persist-reviewed-qa) back into the KB and generate a [browsable wiki index](#wiki-index-browsable-topic-list).
+- **Source-authority weighting** — declare a document's trust level in front matter (`source_type: policy | faq | transcript | …`); at equal relevance, authoritative sources are re-ranked ahead of casual ones, without overriding a clearly better match ([details](#retrieval-pipeline)).
 - **Incremental indexing** — `/build-index` re-embeds only the files whose content changed (per-file SHA-256), reusing the existing vectors for the rest.
 - **Grounding verifier** — after answering, a second LLM pass checks each claim against the retrieved sources and flags anything unsupported ([why](#why-explicit-i-cannot-confirm)).
 - **Injection guard & citation safety** — role-hijack / prompt-leak queries are refused before retrieval, and answer citations are validated against the retrieved set (hallucinated ones stripped, missing ones backfilled).
@@ -322,10 +323,16 @@ For each query:
 2. **Threshold check**. BM25 ≥ 0.5 or cosine ≥ 0.3 — anything below is treated as
    "no confident match"; the server short-circuits to `"I cannot confirm from the
    knowledge base."` without calling the LLM.
-3. **Prompt assembly**. Top hits are joined with their heading path
+3. **Authority re-rank**. Each candidate's score is multiplied by `(1 + priority × 0.05)`,
+   where `priority` comes from the file's `source_type` front matter (`policy`/`official` = 3,
+   `faq`/`guide` = 2, untagged = 1, `transcript`/`chat`/`qa` = 0). The relative factor is
+   scale-invariant across BM25, cosine, and RRF; the top-k is then taken. This lets an
+   official page win a near-tie against a transcript without overriding a clearly more
+   relevant section. (Skipped for LLM Index, whose picks have no comparable score.)
+4. **Prompt assembly**. Top hits are joined with their heading path
    (`refund_policy.md > Refund Policy > Refund timeline`) and inserted into the
    system + user prompt template.
-4. **Generate**. `streamText` with the assembled prompt, streamed back as UI message
+5. **Generate**. `streamText` with the assembled prompt, streamed back as UI message
    parts.
 
 ### Streaming protocol

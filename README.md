@@ -33,6 +33,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 - **Honest "I cannot confirm"** instead of hallucinating when nothing matches ([why](#why-explicit-i-cannot-confirm)).
 - **Conversation memory** that rewrites follow-ups into standalone queries ([details](#conversation-memory-follow-up-questions)).
 - **Persist & browse** — [file reviewed answers](#answer-filing-persist-reviewed-qa) back into the KB and generate a [browsable wiki index](#wiki-index-browsable-topic-list).
+- **Incremental indexing** — `/build-index` re-embeds only the files whose content changed (per-file SHA-256), reusing the existing vectors for the rest.
 - **End-to-end type safety** (Hono RPC), a [paraphrase eval harness](#paraphrase-eval-retrieval-robustness), and Playwright + unit [tests](#tests).
 
 **Contents:** [How to use](#1--how-to-use) · [Advanced usage](#2--advanced-usage) · [How it works](#3--how-it-works) · [Design decisions](#4--design-decisions)
@@ -511,9 +512,12 @@ This implementation is comfortable up to a few thousand sections. Past that:
 
 - BM25 in JavaScript with an in-memory index stops fitting in a single process.
   Move to a dedicated backend (Tantivy / Meilisearch / OpenSearch).
-- HNSW with `hnswlib-node` is fine into the millions of vectors, but rebuilding
-  the index on every `/build-index` becomes slow. Move to a vector DB with
-  incremental upserts (pgvector, Qdrant, Pinecone).
+- HNSW with `hnswlib-node` is fine into the millions of vectors. `/build-index`
+  is **incremental** — it SHA-256-hashes each source file and reuses the stored
+  embeddings of unchanged files (re-embedding only what changed), so routine
+  rebuilds make no OpenAI calls; an embedding-model change forces a full re-embed.
+  At much larger corpora, move to a vector DB with incremental upserts (pgvector,
+  Qdrant, Pinecone).
 - The `/build-index` endpoint should be replaced by a background worker once
   rebuilds take longer than a request cycle.
 

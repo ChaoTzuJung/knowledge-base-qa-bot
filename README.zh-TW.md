@@ -29,6 +29,7 @@ npm run dev:web      # 終端 2 —— Vite 啟動於 :5173（反向代理至 :8
 - **誠實的「我無法確認」**，沒命中時不幻覺（[原因](#為何明確我無法確認)）。
 - **對話記憶**，把追問改寫成獨立完整的查詢（[細節](#對話記憶追問)）。
 - **歸檔與瀏覽** —— 把[審核過的答案歸檔](#answer-filing歸檔已審核的-qa)回知識庫，並產生[可瀏覽的 wiki 索引](#wiki-索引可瀏覽的主題清單)。
+- **增量索引** —— `/build-index` 只對內容有變動的檔案重新嵌入（逐檔 SHA-256），其餘重用既有向量。
 - **端對端型別安全**（Hono RPC）、[paraphrase 評測](#paraphrase-評測檢索穩健度)與 Playwright + 單元[測試](#測試)。
 
 **目錄：** [如何使用](#1--如何使用) · [進階使用](#2--進階使用) · [運作原理](#3--運作原理) · [設計決策](#4--設計決策)
@@ -421,7 +422,7 @@ Hono RPC 將 `client.index` 解析為 `/` 的別名，導致 `client.index.$post
 此實作在數千段落內游刃有餘。再往上：
 
 - JavaScript 記憶體內 BM25 會撐爆單程序 → 改用專用後端（Tantivy、Meilisearch、OpenSearch）。
-- `hnswlib-node` 的 HNSW 支援到百萬級向量，但 `/build-index` 重建會變慢 → 改為增量 upsert 的向量資料庫（pgvector、Qdrant、Pinecone）。
+- `hnswlib-node` 的 HNSW 支援到百萬級向量。`/build-index` 已是**增量**的——對每個來源檔做 SHA-256，未變動的檔案直接重用已存的向量（只對有變動的重新嵌入），所以日常重建不花任何 OpenAI 呼叫；換 embedding 模型則強制全部重嵌。語料再大上去，改為增量 upsert 的向量資料庫（pgvector、Qdrant、Pinecone）。
 - `/build-index` 端點應改為背景工作，避免重建超過請求週期。
 
 目前語料不需上述改動，架構已將策略與儲存分離，替換僅需局部更動。

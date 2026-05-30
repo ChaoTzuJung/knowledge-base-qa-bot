@@ -41,6 +41,11 @@ export interface VectorMetadata {
   count: number;
   chunks: Chunk[];
   max_elements: number;
+  /** Embedding model the stored vectors were produced with. A mismatch forces a
+   *  full re-embed (never mix vectors from different models). */
+  embedding_model: string;
+  /** Per-file SHA-256 of the indexed source, for incremental rebuilds. */
+  file_hashes: Record<string, string>;
 }
 
 export interface RetrievalHit {

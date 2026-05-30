@@ -11,6 +11,7 @@ import { z } from "zod";
 import { OPENAI_MODEL } from "../env.js";
 import { contextualizeQuery, type Turn } from "../llm/contextualize.js";
 import { verifyGrounding } from "../llm/grounding.js";
+import { INJECTION_REFUSAL, detectInjection } from "../llm/safety.js";
 import { SYSTEM_PROMPT } from "../llm/prompts.js";
 import { retrieve } from "../strategies/query.js";
 
@@ -104,6 +105,18 @@ export const chatStreamRoute = new Hono().post(
     const strategy = body.strategy ?? "hybrid";
     const question = extractQuery(body);
     if (!question) return c.json({ error: "Empty query" }, 400);
+
+    // Injection guard: refuse role-hijack / prompt-leak attempts before any
+    // rewrite, retrieval, or LLM call.
+    if (detectInjection(question)) {
+      const refusalStream = createUIMessageStream({
+        execute: ({ writer }) => {
+          writer.write({ type: "data-sources", id: "sources", data: { strategy, sources: [] } });
+          writeText(writer, "refusal-text", INJECTION_REFUSAL);
+        },
+      });
+      return createUIMessageStreamResponse({ stream: refusalStream });
+    }
 
     // Conversation memory: rewrite the follow-up into a standalone query using
     // recent turns, then retrieve with that. Answer generation stays grounded on

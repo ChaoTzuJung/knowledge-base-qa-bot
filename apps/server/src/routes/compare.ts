@@ -15,10 +15,11 @@ export const compareRoute = new Hono().post(
   }),
   async (c) => {
     const { query } = c.req.valid("json");
-    const [markdownKb, vectorRag] = await Promise.all([
+    const [markdownKb, vectorRag, llmIndex] = await Promise.all([
       answerQuery(query, "markdown_kb"),
       answerQuery(query, "vector_rag"),
+      answerQuery(query, "llm_index"),
     ]);
-    return c.json({ markdown_kb: markdownKb, vector_rag: vectorRag });
+    return c.json({ markdown_kb: markdownKb, vector_rag: vectorRag, llm_index: llmIndex });
   },
 );

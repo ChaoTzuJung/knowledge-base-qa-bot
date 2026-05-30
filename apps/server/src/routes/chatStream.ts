@@ -26,7 +26,7 @@ const StreamBody = z
   .object({
     query: z.string().optional(),
     messages: z.array(UIMessageSchema).optional(),
-    strategy: z.enum(["markdown_kb", "vector_rag", "hybrid"]).optional(),
+    strategy: z.enum(["markdown_kb", "vector_rag", "hybrid", "llm_index"]).optional(),
   })
   .refine((v) => v.query || (v.messages && v.messages.length > 0), {
     message: "Provide either query or messages.",
@@ -133,7 +133,11 @@ export const chatStreamRoute = new Hono().post(
 
         if (retrieved.notIndexed) {
           const which =
-            strategy === "markdown_kb" ? "Markdown KB" : strategy === "vector_rag" ? "Vector" : "Hybrid";
+            strategy === "markdown_kb" || strategy === "llm_index"
+              ? "Markdown KB"
+              : strategy === "vector_rag"
+                ? "Vector"
+                : "Hybrid";
           writeText(
             writer,
             "fallback-text",

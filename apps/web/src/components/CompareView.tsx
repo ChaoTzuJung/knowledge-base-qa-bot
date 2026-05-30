@@ -8,6 +8,7 @@ interface CompareState {
   error: string | null;
   markdown_kb: ChatResult | null;
   vector_rag: ChatResult | null;
+  llm_index: ChatResult | null;
   lastQuery: string | null;
 }
 
@@ -16,6 +17,7 @@ const EMPTY: CompareState = {
   error: null,
   markdown_kb: null,
   vector_rag: null,
+  llm_index: null,
   lastQuery: null,
 };
 
@@ -34,6 +36,7 @@ export function CompareView() {
         error: null,
         markdown_kb: r.markdown_kb,
         vector_rag: r.vector_rag,
+        llm_index: r.llm_index,
         lastQuery: query,
       });
     } catch (e) {
@@ -72,15 +75,24 @@ export function CompareView() {
         </div>
       )}
 
-      <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-2">
+      <div className="grid flex-1 grid-cols-1 gap-4 overflow-hidden md:grid-cols-3">
         <ResultColumn title="Markdown KB (BM25)" result={state.markdown_kb} />
         <ResultColumn title="Vector RAG (HNSW)" result={state.vector_rag} />
+        <ResultColumn title="LLM Index (router)" result={state.llm_index} rankMode />
       </div>
     </div>
   );
 }
 
-function ResultColumn({ title, result }: { title: string; result: ChatResult | null }) {
+function ResultColumn({
+  title,
+  result,
+  rankMode = false,
+}: {
+  title: string;
+  result: ChatResult | null;
+  rankMode?: boolean;
+}) {
   return (
     <section className="flex h-full flex-col overflow-hidden rounded-lg border border-border bg-card">
       <header className="border-b border-border px-4 py-3 text-sm font-semibold">
@@ -103,7 +115,7 @@ function ResultColumn({ title, result }: { title: string; result: ChatResult | n
                       <div className="flex items-baseline justify-between gap-2">
                         <code className="font-mono text-[11px]">{s.source}</code>
                         <span className="text-[10px] text-muted-foreground">
-                          score {s.score.toFixed(3)}
+                          {rankMode ? `rank ${s.score}` : `score ${s.score.toFixed(3)}`}
                         </span>
                       </div>
                       <div className="mt-1 text-muted-foreground">{s.heading}</div>

@@ -37,7 +37,7 @@ test.describe("Cold start", () => {
     await expect(page.getByText("Index", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Build Index" })).toBeVisible();
 
-    // expect: right sidebar shows "RETRIEVAL STRATEGY" with three options; "Hybrid" is selected by default
+    // expect: right sidebar shows "RETRIEVAL STRATEGY" with four options; "Hybrid" is selected by default
     await expect(page.getByText("Retrieval Strategy")).toBeVisible();
     const hybridBtn = page.getByRole("button", { name: "Hybrid BM25 + Vector, fused with RRF" });
     await expect(hybridBtn).toBeVisible();
@@ -48,6 +48,9 @@ test.describe("Cold start", () => {
     const vectorRagBtn = page.getByRole("button", { name: "Vector RAG Embeddings + HNSW (cosine)" });
     await expect(vectorRagBtn).toBeVisible();
     await expect(vectorRagBtn).not.toHaveClass(/border-primary/);
+    const llmIndexBtn = page.getByRole("button", { name: "LLM Index LLM picks sections from the wiki index" });
+    await expect(llmIndexBtn).toBeVisible();
+    await expect(llmIndexBtn).not.toHaveClass(/border-primary/);
 
     // expect: right sidebar shows "SOURCES" with empty state message
     await expect(page.getByText("Sources will appear here after you ask a question.")).toBeVisible();

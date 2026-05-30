@@ -28,7 +28,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 
 ## Features
 
-- **Three retrieval strategies** — Markdown KB (BM25), Vector RAG (HNSW), and **Hybrid (the default)**, which fuses both with Reciprocal Rank Fusion; switchable per query, with a side-by-side `/compare` view ([why](#why-two-retrieval-strategies)).
+- **Four retrieval strategies** — Markdown KB (BM25), Vector RAG (HNSW), **Hybrid (the default)** which fuses both via Reciprocal Rank Fusion, and **LLM Index** which lets the model pick sections straight from the wiki catalog; switchable per query, with a side-by-side `/compare` view ([why](#why-two-retrieval-strategies)).
 - **Grounded answers with inline citations**, streamed token-by-token over the AI SDK v6 [streaming protocol](#streaming-protocol).
 - **Honest "I cannot confirm"** instead of hallucinating when nothing matches ([why](#why-explicit-i-cannot-confirm)).
 - **Conversation memory** that rewrites follow-ups into standalone queries ([details](#conversation-memory-follow-up-questions)).
@@ -301,9 +301,9 @@ it, so single-turn behavior is unchanged.
 |--------|-----------------|---------------------------------------------------------------|-----------------------------------------------------------|
 | GET    | `/health`       | —                                                             | `{ "status": "ok" }`                                      |
 | POST   | `/build-index`  | —                                                             | `{ files_indexed, sections_indexed, chunks_indexed, ... }`|
-| POST   | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" }` | `{ answer, sources, strategy }`                       |
+| POST   | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" \| "llm_index" }` | `{ answer, sources, strategy }` |
 | POST   | `/chat/stream`  | `{ query, strategy? }` or `{ messages: [...], strategy? }`    | AI SDK UI message stream (SSE)                            |
-| POST   | `/compare`      | `{ query }`                                                   | `{ markdown_kb: {...}, vector_rag: {...} }`               |
+| POST   | `/compare`      | `{ query }`                                                   | `{ markdown_kb: {...}, vector_rag: {...}, llm_index: {...} }` |
 | POST   | `/file-answer`  | `{ query, answer, sources?, strategy? }`                     | `{ filed, slug, file }`                                   |
 
 ### Retrieval pipeline
@@ -426,6 +426,14 @@ precision plus vector's synonym recall. RRF combines *ranks*, not the raw,
 non-comparable BM25/cosine scores. It still answers only when at least one
 retriever clears its own confidence threshold, preserving the "I cannot confirm"
 guarantee.
+
+**LLM Index** is a fourth, retrieval-light mode: instead of BM25 or embeddings it
+hands the section catalog (the same map `wiki/index.md` renders) to the model and
+asks it to pick the relevant section ids by meaning. It needs no vector index —
+just the Markdown sections — and rides on the catalog the project already
+generates. Hallucinated ids are dropped, and if the router picks nothing the
+answer short-circuits to "I cannot confirm". It trades one extra LLM call per
+query for retrieval that understands intent without embeddings.
 
 ### Why a heading section as the retrieval unit?
 

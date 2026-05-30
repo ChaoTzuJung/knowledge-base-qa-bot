@@ -69,7 +69,7 @@ export function SourcesPanel() {
               <div className="flex items-baseline justify-between gap-2">
                 <code className="font-mono text-[11px] text-foreground">{s.source}</code>
                 <span className="text-[10px] text-muted-foreground">
-                  score {s.score.toFixed(3)}
+                  {strategy === "llm_index" ? `rank ${s.score}` : `score ${s.score.toFixed(3)}`}
                 </span>
               </div>
               <div className="mt-1 text-muted-foreground">{s.heading}</div>

@@ -112,6 +112,7 @@ npm run dev:web      # Vite 前端，:5173
 npm run import:raw   # 將 raw/*.txt|*.html 正規化成 docs/*.md
 npm run generate:wiki # 從 .kb/index.json 重新產生 wiki/index.md
 npm run eval         # paraphrase 檢索評測（BM25 vs 向量）
+npm run eval:answer  # 答案層級評測：引用、決策、grounding（需 OPENAI_API_KEY）
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test 單元測試（raw→Markdown 轉換函式）
 npm run test:e2e     # Playwright 測試套件（自動啟動 dev servers）
@@ -214,6 +215,33 @@ Summary (out of 15 paraphrases)
 圖例：✅ 預期段落為 top-1、🔸 預期段落落在 top-3、❌ 命中錯誤段落。題庫位於
 [`apps/server/src/eval/paraphrase.ts`](apps/server/src/eval/paraphrase.ts)，可在此
 新增意圖與改寫句。
+
+### 答案層級評測（引用、決策、grounding）
+
+`npm run eval:answer` 會跑**完整**管線（檢索 → 回答 → grounding 驗證）並計算檢索評測看不到的指標——把「**有沒有檢索到**正確段落」和「答案**有沒有真的引用**它」「**有沒有亂編引用**」分開：
+
+- **retrieval_recall / top1_hit** —— 預期段落是否被檢索到 / 排在第一。
+- **citation_recall** —— 預期來源中，答案實際引用了幾個。
+- **citation_precision** —— 答案引用的來源中，有多少真的被檢索到（< 1 表示有亂編的引用）。
+- **decision_match** —— 該回答 vs 該拒答；題庫含「必須回『我無法確認』」的範圍外問題。
+- **answer_grounded** —— 答後 grounding 判定。
+
+```text
+Summary
+   Decision match (all):     13/14
+   — answer cases —
+   Retrieval recall (avg):   1.00
+   Top-1 hit rate:           7/9
+   Citation recall (avg):    0.89
+   Citation precision (avg): 1.00
+   Grounded rate:            8/9
+   — refusal cases —
+   Correctly refused:        5/5
+```
+
+需要 `OPENAI_API_KEY`（每題都跑 `answerQuery`）。題庫在
+[`apps/server/src/eval/cases.ts`](apps/server/src/eval/cases.ts)；指標計算是純函式，單元測試在
+[`metrics.test.ts`](apps/server/src/eval/metrics.test.ts)。
 
 ### 對話記憶（追問）
 

@@ -117,6 +117,7 @@ npm run dev:web      # Vite frontend, :5173
 npm run import:raw   # normalize raw/*.txt|*.html into docs/*.md
 npm run generate:wiki # regenerate wiki/index.md from .kb/index.json
 npm run eval         # paraphrase retrieval eval (BM25 vs vector)
+npm run eval:answer  # answer-level eval: citations, decision, grounding (needs OPENAI_API_KEY)
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test unit tests (raw→Markdown helpers)
 npm run test:e2e     # Playwright suite (auto-starts both dev servers)
@@ -225,6 +226,38 @@ Summary (out of 15 paraphrases)
 Legend: ✅ expected is top-1, 🔸 expected in top-3, ❌ wrong section. The probes live
 in [`apps/server/src/eval/paraphrase.ts`](apps/server/src/eval/paraphrase.ts) — add
 intents and paraphrases there.
+
+### Answer-level eval (citations, decision, grounding)
+
+`npm run eval:answer` runs the **full** pipeline (retrieve → answer → grounding verify)
+over a curated case set and scores axes the retrieval eval is blind to — separating
+*"was the right section retrieved"* from *"did the answer actually cite it"* and *"did it
+hallucinate a citation"*:
+
+- **retrieval_recall / top1_hit** — expected section retrieved / ranked first.
+- **citation_recall** — of the expected sources, how many the answer cited.
+- **citation_precision** — of what the answer cited, how much was actually retrieved
+  (< 1 ⇒ a hallucinated citation).
+- **decision_match** — answered vs. correctly refused; the case set includes out-of-scope
+  questions that *must* return "I cannot confirm".
+- **answer_grounded** — the post-answer grounding verdict.
+
+```text
+Summary
+   Decision match (all):     13/14
+   — answer cases —
+   Retrieval recall (avg):   1.00
+   Top-1 hit rate:           7/9
+   Citation recall (avg):    0.89
+   Citation precision (avg): 1.00
+   Grounded rate:            8/9
+   — refusal cases —
+   Correctly refused:        5/5
+```
+
+It needs `OPENAI_API_KEY` (every case runs `answerQuery`). Cases live in
+[`apps/server/src/eval/cases.ts`](apps/server/src/eval/cases.ts); the metric math is pure and
+unit-tested in [`metrics.test.ts`](apps/server/src/eval/metrics.test.ts).
 
 ### Conversation memory (follow-up questions)
 

@@ -37,11 +37,14 @@ test.describe("Cold start", () => {
     await expect(page.getByText("Index", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Build Index" })).toBeVisible();
 
-    // expect: right sidebar shows "RETRIEVAL STRATEGY" label with two options; "Markdown KB" is selected
+    // expect: right sidebar shows "RETRIEVAL STRATEGY" with three options; "Hybrid" is selected by default
     await expect(page.getByText("Retrieval Strategy")).toBeVisible();
+    const hybridBtn = page.getByRole("button", { name: "Hybrid BM25 + Vector, fused with RRF" });
+    await expect(hybridBtn).toBeVisible();
+    await expect(hybridBtn).toHaveClass(/border-primary/);
     const markdownKbBtn = page.getByRole("button", { name: "Markdown KB BM25 over heading sections" });
     await expect(markdownKbBtn).toBeVisible();
-    await expect(markdownKbBtn).toHaveClass(/border-primary/);
+    await expect(markdownKbBtn).not.toHaveClass(/border-primary/);
     const vectorRagBtn = page.getByRole("button", { name: "Vector RAG Embeddings + HNSW (cosine)" });
     await expect(vectorRagBtn).toBeVisible();
     await expect(vectorRagBtn).not.toHaveClass(/border-primary/);

@@ -6,7 +6,8 @@ interface Props {
   onChange: (s: Strategy) => void;
 }
 
-const OPTIONS: { value: Strategy; label: string; hint: string }[] = [
+const OPTIONS: { value: Strategy; label: string; hint: string; span?: boolean }[] = [
+  { value: "hybrid", label: "Hybrid", hint: "BM25 + Vector, fused with RRF", span: true },
   { value: "markdown_kb", label: "Markdown KB", hint: "BM25 over heading sections" },
   { value: "vector_rag", label: "Vector RAG", hint: "Embeddings + HNSW (cosine)" },
 ];
@@ -25,6 +26,7 @@ export function StrategyPicker({ value, onChange }: Props) {
             onClick={() => onChange(opt.value)}
             className={cn(
               "rounded-md border px-3 py-2 text-left text-sm transition",
+              opt.span && "col-span-2",
               value === opt.value
                 ? "border-primary bg-primary/5 text-foreground"
                 : "border-border bg-card text-muted-foreground hover:bg-accent",

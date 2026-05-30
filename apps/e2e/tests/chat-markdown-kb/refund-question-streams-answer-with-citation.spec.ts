@@ -5,12 +5,13 @@ import { test, expect } from "../fixtures";
 
 test.describe("Chat with Markdown KB", () => {
   test("refund-question-streams-answer-with-citation", async ({ page }) => {
-    // 1. Confirm "Markdown KB" is the selected strategy in the right panel
-    // expect: the "Markdown KB" strategy card has a primary-tinted border (class matches /border-primary/)
+    // 1. Select the "Markdown KB" strategy (Hybrid is the default).
     const markdownKbBtn = page.getByRole("button", {
       name: /Markdown KB/,
     });
     await expect(markdownKbBtn).toBeVisible();
+    await markdownKbBtn.click();
+    // expect: the "Markdown KB" strategy card now has a primary-tinted border (/border-primary/)
     await expect(markdownKbBtn).toHaveClass(/border-primary/);
 
     // 2. Click the suggestion button "How long do refunds take?"

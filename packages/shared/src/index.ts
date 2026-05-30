@@ -1,4 +1,4 @@
-export type Strategy = "markdown_kb" | "vector_rag";
+export type Strategy = "markdown_kb" | "vector_rag" | "hybrid";
 
 export interface SourceInfo {
   source: string;

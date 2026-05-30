@@ -24,7 +24,7 @@ npm run dev:web      # 終端 2 —— Vite 啟動於 :5173（反向代理至 :8
 
 ## 功能特色
 
-- **兩種可互換的檢索策略** —— Markdown KB（BM25）與 Vector RAG（HNSW），可逐次查詢切換，並有並排 `/compare` 比較（[原因](#為何提供兩種檢索策略)）。
+- **三種檢索策略** —— Markdown KB（BM25）、Vector RAG（HNSW），以及 **Hybrid（預設）**：用 Reciprocal Rank Fusion 融合前兩者；可逐次查詢切換，並有並排 `/compare` 比較（[原因](#為何提供兩種檢索策略)）。
 - **具來源引用的答案**，以 AI SDK v6 [串流協議](#串流協議)逐字串流。
 - **誠實的「我無法確認」**，沒命中時不幻覺（[原因](#為何明確我無法確認)）。
 - **對話記憶**，把追問改寫成獨立完整的查詢（[細節](#對話記憶追問)）。
@@ -286,7 +286,7 @@ curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d
 |------|-----------------|--------------------------------------------------------------|----------------------------------------------------------|
 | GET  | `/health`       | —                                                            | `{ "status": "ok" }`                                     |
 | POST | `/build-index`  | —                                                            | `{ files_indexed, sections_indexed, chunks_indexed, … }` |
-| POST | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" }`        | `{ answer, sources, strategy }`                          |
+| POST | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" }` | `{ answer, sources, strategy }`                     |
 | POST | `/chat/stream`  | `{ query, strategy? }` 或 `{ messages: [...], strategy? }`    | AI SDK UI message stream（SSE）                          |
 | POST | `/compare`      | `{ query }`                                                  | `{ markdown_kb: {...}, vector_rag: {...} }`              |
 | POST | `/file-answer`  | `{ query, answer, sources?, strategy? }`                    | `{ filed, slug, file }`                                  |
@@ -375,6 +375,8 @@ Playwright 設定檔的 `webServer` 區塊讓 `npm run test:e2e` 自動啟動 `d
 題目要求「具來源引用」。BM25 與向量 RAG 的失敗模式不同，且語料小，並行執行成本極低。`/compare` 可視化差異，讓讀者建立直覺：
 「退款多久入帳？」 → BM25 因標題含關鍵字而命中；
 「When will I get my money back?（我的錢何時退回？）」 → 向量勝出，因「money back」對不上「refund」這個字，BM25 無法據以回答，而向量仍能檢索到退款時程段落。本 README 最上方的 demo 即示範了這個對比。
+
+**Hybrid 是預設**，讓你不必逐題二選一：它同時跑兩種檢索，用 Reciprocal Rank Fusion（RRF，K=60）融合兩邊的排名——只要任一邊把某段落排得高就會浮上來，同時拿到 BM25 的關鍵字精準度與向量的同義詞召回。RRF 融合的是**排名**，不是 BM25／cosine 那種彼此不可比的原始分數。它仍維持「至少一種檢索通過自己的信心門檻才回答」，保住「我無法確認」的保證。
 
 ### 為何以標題段落為檢索單位？
 

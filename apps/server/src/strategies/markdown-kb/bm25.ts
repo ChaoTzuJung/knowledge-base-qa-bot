@@ -6,6 +6,9 @@ const K1 = 1.5;
 const B = 0.75;
 const HEADING_BOOST = 1.5;
 
+/** Minimum top BM25 score to treat a result as a confident match. */
+export const BM25_THRESHOLD = 0.5;
+
 export function bm25Score(queryTokens: string[], section: Section): number {
   if (state.sections.length === 0) return 0;
 
@@ -39,7 +42,7 @@ export interface RankedSection {
   score: number;
 }
 
-export function search(query: string, k = 3, threshold = 0.5): RankedSection[] {
+export function search(query: string, k = 3, threshold = BM25_THRESHOLD): RankedSection[] {
   const queryTokens = tokenize(query);
   if (queryTokens.length === 0) return [];
 

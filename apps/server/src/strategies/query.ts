@@ -2,6 +2,7 @@ import type { Chunk, ChatResult, Section, SourceInfo, Strategy } from "../lib/ty
 import { generateAnswer } from "../llm/answer.js";
 import { verifyGrounding } from "../llm/grounding.js";
 import { buildPrompt, sectionsToContext } from "../llm/prompts.js";
+import { INJECTION_REFUSAL, detectInjection, sanitizeCitations } from "../llm/safety.js";
 import { BM25_THRESHOLD, search as bm25Search } from "./markdown-kb/bm25.js";
 import { isIndexed as isMarkdownIndexed, state as markdownState } from "./markdown-kb/indexer.js";
 import { selectSections } from "./llm-index/router.js";
@@ -133,6 +134,9 @@ export async function answerQuery(
   strategy: Strategy,
   opts: { verify?: boolean } = {},
 ): Promise<ChatResult> {
+  if (detectInjection(query)) {
+    return { answer: INJECTION_REFUSAL, sources: [] };
+  }
   const r = await retrieve(query, strategy);
   if (r.notIndexed) {
     const which =
@@ -149,7 +153,8 @@ export async function answerQuery(
   if (!r.ok || !r.prompt) {
     return { answer: "I cannot confirm from the knowledge base.", sources: [] };
   }
-  const answer = await generateAnswer(r.prompt);
+  const raw = await generateAnswer(r.prompt);
+  const answer = sanitizeCitations(raw, r.sources.map((s) => s.source));
   const grounding = opts.verify ? await verifyGrounding(answer, r.context ?? "") : undefined;
   return { answer, sources: r.sources, grounding };
 }

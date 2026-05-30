@@ -35,6 +35,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 - **Persist & browse** — [file reviewed answers](#answer-filing-persist-reviewed-qa) back into the KB and generate a [browsable wiki index](#wiki-index-browsable-topic-list).
 - **Incremental indexing** — `/build-index` re-embeds only the files whose content changed (per-file SHA-256), reusing the existing vectors for the rest.
 - **Grounding verifier** — after answering, a second LLM pass checks each claim against the retrieved sources and flags anything unsupported ([why](#why-explicit-i-cannot-confirm)).
+- **Injection guard & citation safety** — role-hijack / prompt-leak queries are refused before retrieval, and answer citations are validated against the retrieved set (hallucinated ones stripped, missing ones backfilled).
 - **End-to-end type safety** (Hono RPC), a [paraphrase eval harness](#paraphrase-eval-retrieval-robustness), and Playwright + unit [tests](#tests).
 
 **Contents:** [How to use](#1--how-to-use) · [Advanced usage](#2--advanced-usage) · [How it works](#3--how-it-works) · [Design decisions](#4--design-decisions)
@@ -461,6 +462,17 @@ returning `{ grounded, unsupported[] }`. On `/chat/stream` the verdict streams a
 a trailing `data-grounding` part (the answer streams in real time, then the badge
 appears); `/chat` returns it inline. It fails open — a flaky checker never
 suppresses a valid answer — so it surfaces unsupported claims rather than blocking.
+
+Two more guards sit at the edges. Incoming queries are screened for
+**prompt-injection / role-hijack** patterns (e.g. "ignore previous instructions",
+"reveal your system prompt") and refused before any retrieval or LLM call; the
+system prompt also marks the context and question as untrusted data, not commands.
+On the way out, the answer's inline citations are **validated against the
+retrieved set** — hallucinated ids are stripped, and if none remain the top
+source is backfilled (applied on `/chat`; `/chat/stream` relies on the prompt plus
+the grounding verifier, since its text is already streamed). The injection
+patterns deliberately avoid bare keywords ("password", "api key") so genuine
+support questions are never blocked.
 
 ### Why stream sources *before* tokens?
 

@@ -14,6 +14,7 @@ import { verifyGrounding } from "../llm/grounding.js";
 import { INJECTION_REFUSAL, detectInjection } from "../llm/safety.js";
 import { SYSTEM_PROMPT } from "../llm/prompts.js";
 import { retrieve } from "../strategies/query.js";
+import { logTurn } from "../dream/log.js";
 
 const MessagePart = z.object({ type: z.string() }).passthrough();
 
@@ -109,6 +110,7 @@ export const chatStreamRoute = new Hono().post(
     // Injection guard: refuse role-hijack / prompt-leak attempts before any
     // rewrite, retrieval, or LLM call.
     if (detectInjection(question)) {
+      logTurn({ ts: new Date().toISOString(), query: question, answer: INJECTION_REFUSAL, strategy, sources: [] });
       const refusalStream = createUIMessageStream({
         execute: ({ writer }) => {
           writer.write({ type: "data-sources", id: "sources", data: { strategy, sources: [] } });
@@ -152,16 +154,16 @@ export const chatStreamRoute = new Hono().post(
               : strategy === "vector_rag"
                 ? "Vector"
                 : "Hybrid";
-          writeText(
-            writer,
-            "fallback-text",
-            `The ${which} index has not been built yet. Call POST /index first.`,
-          );
+          const msg = `The ${which} index has not been built yet. Call POST /index first.`;
+          writeText(writer, "fallback-text", msg);
+          logTurn({ ts: new Date().toISOString(), query, answer: msg, strategy, sources: [] });
           return;
         }
 
         if (!retrieved.ok || !retrieved.prompt) {
-          writeText(writer, "fallback-text", "I cannot confirm from the knowledge base.");
+          const msg = "I cannot confirm from the knowledge base.";
+          writeText(writer, "fallback-text", msg);
+          logTurn({ ts: new Date().toISOString(), query, answer: msg, strategy, sources: retrieved.sources });
           return;
         }
 
@@ -188,6 +190,14 @@ export const chatStreamRoute = new Hono().post(
         const fullText = await result.text;
         const grounding = await verifyGrounding(fullText, retrieved.context ?? "");
         writer.write({ type: "data-grounding", id: "grounding", data: grounding });
+        logTurn({
+          ts: new Date().toISOString(),
+          query,
+          answer: fullText,
+          strategy,
+          sources: retrieved.sources,
+          grounding,
+        });
       },
       onError: (err) => {
         console.error("[/chat/stream] error:", err);

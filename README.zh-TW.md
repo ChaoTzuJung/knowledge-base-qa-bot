@@ -288,7 +288,7 @@ curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d
 | POST | `/build-index`  | —                                                            | `{ files_indexed, sections_indexed, chunks_indexed, … }` |
 | POST | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" \| "llm_index" }` | `{ answer, sources, strategy }` |
 | POST | `/chat/stream`  | `{ query, strategy? }` 或 `{ messages: [...], strategy? }`    | AI SDK UI message stream（SSE）                          |
-| POST | `/compare`      | `{ query }`                                                  | `{ markdown_kb: {...}, vector_rag: {...} }`              |
+| POST | `/compare`      | `{ query }`                                                  | `{ markdown_kb: {...}, vector_rag: {...}, llm_index: {...} }` |
 | POST | `/file-answer`  | `{ query, answer, sources?, strategy? }`                    | `{ filed, slug, file }`                                  |
 
 ### 檢索流程

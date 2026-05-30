@@ -303,7 +303,7 @@ it, so single-turn behavior is unchanged.
 | POST   | `/build-index`  | —                                                             | `{ files_indexed, sections_indexed, chunks_indexed, ... }`|
 | POST   | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" \| "llm_index" }` | `{ answer, sources, strategy }` |
 | POST   | `/chat/stream`  | `{ query, strategy? }` or `{ messages: [...], strategy? }`    | AI SDK UI message stream (SSE)                            |
-| POST   | `/compare`      | `{ query }`                                                   | `{ markdown_kb: {...}, vector_rag: {...} }`               |
+| POST   | `/compare`      | `{ query }`                                                   | `{ markdown_kb: {...}, vector_rag: {...}, llm_index: {...} }` |
 | POST   | `/file-answer`  | `{ query, answer, sources?, strategy? }`                     | `{ filed, slug, file }`                                   |
 
 ### Retrieval pipeline

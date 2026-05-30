@@ -57,9 +57,9 @@ export async function retrieve(
     const selected = await selectSections(query, markdownState.sections);
     if (selected.length === 0) return { ok: false, sources: [], notIndexed: false };
 
-    // No numeric retrieval score here; surface a rank-derived score (best first)
-    // so the sources panel stays meaningful.
-    const scores = selected.map((_, i) => (selected.length - i) / selected.length);
+    // No similarity score for the LLM router; expose the 1-based pick order, which
+    // the UI renders as "rank N" instead of a misleading decimal score.
+    const scores = selected.map((_, i) => i + 1);
     const ctx = sectionsToContext(selected, scores);
     return {
       ok: true,

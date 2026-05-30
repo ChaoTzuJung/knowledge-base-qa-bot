@@ -4,7 +4,7 @@
 import { test, expect } from "../fixtures";
 
 test.describe("Compare mode", () => {
-  test("compare-shows-both-strategies-side-by-side", async ({ page }) => {
+  test("compare-shows-all-strategies-side-by-side", async ({ page }) => {
     // 1. Click the "Compare" toggle in the header
     // The header has two mode toggle buttons: "Chat" and "Compare".
     // The submit button inside the CompareView form also reads "Compare", so we scope the toggle
@@ -23,12 +23,13 @@ test.describe("Compare mode", () => {
     const compareSubmitBtn = page.locator("form").getByRole("button", { name: "Compare" });
     await expect(compareSubmitBtn).toBeVisible();
 
-    // expect: two column headers visible: "Markdown KB (BM25)" and "Vector RAG (HNSW)"
+    // expect: three column headers visible: Markdown KB, Vector RAG, and LLM Index
     await expect(page.getByText("Markdown KB (BM25)", { exact: true })).toBeVisible();
     await expect(page.getByText("Vector RAG (HNSW)", { exact: true })).toBeVisible();
+    await expect(page.getByText("LLM Index (router)", { exact: true })).toBeVisible();
 
-    // expect: both columns show "No result yet."
-    await expect(page.getByText("No result yet.")).toHaveCount(2);
+    // expect: all three columns show "No result yet."
+    await expect(page.getByText("No result yet.")).toHaveCount(3);
 
     // 2. Type "How long do refunds take?" into the compare input
     await compareInput.fill("How long do refunds take?");
@@ -51,14 +52,21 @@ test.describe("Compare mode", () => {
     // collisions ("5-7 business days" appears in both the answer body and the source preview).
     const markdownKbSection = page.locator("section").filter({ hasText: "Markdown KB (BM25)" });
     const vectorRagSection = page.locator("section").filter({ hasText: "Vector RAG (HNSW)" });
+    const llmIndexSection = page.locator("section").filter({ hasText: "LLM Index (router)" });
 
     await expect(markdownKbSection).toContainText("5-7 business days", { timeout: 45_000 });
     await expect(markdownKbSection).toContainText("refund_policy.md#refund-timeline", { timeout: 45_000 });
     await expect(vectorRagSection).toContainText("5-7 business days", { timeout: 45_000 });
     await expect(vectorRagSection).toContainText("refund_policy.md#refund-timeline", { timeout: 45_000 });
+    await expect(llmIndexSection).toContainText("5-7 business days", { timeout: 45_000 });
+    await expect(llmIndexSection).toContainText("refund_policy.md#refund-timeline", { timeout: 45_000 });
 
-    // expect: both columns show at least one source card under a "Sources" sub-header
+    // expect: the LLM Index column labels its picks by rank (not a decimal score)
+    await expect(llmIndexSection.getByText(/rank 1/)).toBeVisible();
+
+    // expect: all three columns show at least one source card under a "Sources" sub-header
     await expect(markdownKbSection.getByText("Sources")).toBeVisible();
     await expect(vectorRagSection.getByText("Sources")).toBeVisible();
+    await expect(llmIndexSection.getByText("Sources")).toBeVisible();
   });
 });

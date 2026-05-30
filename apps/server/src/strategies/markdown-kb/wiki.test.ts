@@ -5,7 +5,7 @@ import { generateWikiIndex } from "./wiki.js";
 
 function section(file: string, heading: string, heading_path: string[]): Section {
   const slug = heading.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return { id: `${file}#${slug}`, file, heading, heading_path, content: "", tokens: [] };
+  return { id: `${file}#${slug}`, file, heading, heading_path, content: "", tokens: [], priority: 1 };
 }
 
 test("generateWikiIndex groups sections under one heading per file", () => {

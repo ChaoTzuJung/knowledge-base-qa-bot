@@ -1,6 +1,9 @@
 import type { Section } from "../../lib/types.js";
+import { DEFAULT_PRIORITY, priorityForSourceType } from "../authority.js";
 
 const HEADING_RE = /^(#{1,6})\s+(.+?)\s*$/;
+// Leading YAML-ish front matter: a `---` fence, key: value lines, a closing `---`.
+const FRONT_MATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 
 // CJK characters we keep as meaningful tokens: CJK ideographs (+ Extension A and
 // compatibility forms), Japanese kana, and Hangul syllables. All are in the BMP,
@@ -47,8 +50,32 @@ export function tokenize(text: string): string[] {
   return tokens;
 }
 
+/**
+ * Strip a leading front-matter block and derive the file's authority priority
+ * from it. Supports an explicit numeric `priority:` or a named `source_type:`
+ * (mapped via authority.ts). Files without front matter use the default priority.
+ */
+export function parseFrontMatter(source: string): { priority: number; body: string } {
+  const m = source.match(FRONT_MATTER_RE);
+  if (!m) return { priority: DEFAULT_PRIORITY, body: source };
+
+  const fields: Record<string, string> = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^([A-Za-z_][\w-]*):\s*(.*)$/);
+    if (kv) fields[kv[1].toLowerCase()] = kv[2].trim().replace(/^["']|["']$/g, "");
+  }
+
+  const explicit = Number(fields.priority);
+  const priority = Number.isFinite(explicit) && fields.priority !== undefined
+    ? explicit
+    : priorityForSourceType(fields.source_type);
+
+  return { priority, body: source.slice(m[0].length) };
+}
+
 export function parseMarkdown(file: string, source: string): Section[] {
-  const lines = source.split(/\r?\n/);
+  const { priority, body } = parseFrontMatter(source);
+  const lines = body.split(/\r?\n/);
   const sections: Section[] = [];
 
   let headingStack: { level: number; text: string }[] = [];
@@ -63,7 +90,7 @@ export function parseMarkdown(file: string, source: string): Section[] {
     const heading_path = [...currentHeadingPath];
     const id = `${file}#${slugify(heading)}`;
     const tokens = tokenize(`${heading_path.join(" ")} ${content}`);
-    sections.push({ id, file, heading, heading_path, content, tokens });
+    sections.push({ id, file, heading, heading_path, content, tokens, priority });
   };
 
   for (const line of lines) {

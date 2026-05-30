@@ -4,7 +4,7 @@ import type { Section } from "../../lib/types.js";
 import { buildCatalog, parseSelection } from "./router.js";
 
 function section(id: string, heading_path: string[]): Section {
-  return { id, file: id.split("#")[0], heading: heading_path.at(-1) ?? "", heading_path, content: "", tokens: [] };
+  return { id, file: id.split("#")[0], heading: heading_path.at(-1) ?? "", heading_path, content: "", tokens: [], priority: 1 };
 }
 
 test("buildCatalog: one line per section with id and breadcrumb", () => {

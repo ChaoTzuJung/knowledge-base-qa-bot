@@ -6,6 +6,7 @@ import { INJECTION_REFUSAL, detectInjection, sanitizeCitations } from "../llm/sa
 import { BM25_THRESHOLD, search as bm25Search } from "./markdown-kb/bm25.js";
 import { isIndexed as isMarkdownIndexed, state as markdownState } from "./markdown-kb/indexer.js";
 import { selectSections } from "./llm-index/router.js";
+import { rerankByAuthority } from "./authority.js";
 import { reciprocalRankFusion } from "./rrf.js";
 import { isVectorIndexed, vectorState } from "./vector-rag/indexer.js";
 import { SIMILARITY_THRESHOLD, vectorSearch } from "./vector-rag/retriever.js";
@@ -18,6 +19,12 @@ interface RetrieveResult {
   sources: SourceInfo[];
   notIndexed: boolean;
 }
+
+/** Sections/chunks fed to the answer LLM. */
+const TOP_K = 3;
+/** Wider pool retrieved before authority re-ranking, so a high-authority result
+ *  just outside the top-K can still surface ahead of a lower-authority one. */
+const CANDIDATE_POOL = 5;
 
 function toSources(
   items: Array<{ id: string; heading_path: string[]; content: string }>,
@@ -56,12 +63,16 @@ function buildRetrieved(
 export async function retrieve(query: string, strategy: Strategy): Promise<RetrieveResult> {
   if (strategy === "markdown_kb") {
     if (!isMarkdownIndexed()) return { ok: false, sources: [], notIndexed: true };
-    const ranked = bm25Search(query, 3);
+    const ranked = bm25Search(query, CANDIDATE_POOL);
     if (ranked.length === 0) return { ok: false, sources: [], notIndexed: false };
-    return buildRetrieved(
-      query,
+    const top = rerankByAuthority(
       ranked.map((r) => r.section),
       ranked.map((r) => r.score),
+    ).slice(0, TOP_K);
+    return buildRetrieved(
+      query,
+      top.map((t) => t.item),
+      top.map((t) => t.score),
     );
   }
 
@@ -102,7 +113,7 @@ export async function retrieve(query: string, strategy: Strategy): Promise<Retri
 
     const bm25Ids = bm25Ranked.map((r) => r.section.id);
     const vectorIds = vectorHits.map((h) => parentSectionId(h.chunk.id));
-    const fused = reciprocalRankFusion([bm25Ids, vectorIds]).slice(0, 3);
+    const fused = reciprocalRankFusion([bm25Ids, vectorIds]);
 
     // Fuse at section granularity; the Markdown KB store holds the full section
     // text (vector chunks may be partial), so it is the canonical content source.
@@ -112,20 +123,30 @@ export async function retrieve(query: string, strategy: Strategy): Promise<Retri
       .filter((r): r is { section: Section; score: number } => r.section !== undefined);
     if (ranked.length === 0) return { ok: false, sources: [], notIndexed: false };
 
-    return buildRetrieved(
-      query,
+    // Apply source-authority re-ranking to the fused pool, then take the top-K.
+    const top = rerankByAuthority(
       ranked.map((r) => r.section),
       ranked.map((r) => r.score),
+    ).slice(0, TOP_K);
+
+    return buildRetrieved(
+      query,
+      top.map((t) => t.item),
+      top.map((t) => t.score),
     );
   }
 
   if (!isVectorIndexed()) return { ok: false, sources: [], notIndexed: true };
-  const hits = await vectorSearch(query, 3);
+  const hits = await vectorSearch(query, CANDIDATE_POOL);
   if (hits.length === 0) return { ok: false, sources: [], notIndexed: false };
-  return buildRetrieved(
-    query,
+  const top = rerankByAuthority(
     hits.map((h) => h.chunk),
     hits.map((h) => h.score),
+  ).slice(0, TOP_K);
+  return buildRetrieved(
+    query,
+    top.map((t) => t.item),
+    top.map((t) => t.score),
   );
 }
 

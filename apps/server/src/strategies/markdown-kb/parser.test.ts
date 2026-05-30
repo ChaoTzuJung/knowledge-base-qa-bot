@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMarkdown, slugify, tokenize } from "./parser.js";
+import { parseFrontMatter, parseMarkdown, slugify, tokenize } from "./parser.js";
+import { DEFAULT_PRIORITY } from "../authority.js";
 
 test("tokenize: English words, lowercased, stopwords removed", () => {
   assert.deepEqual(tokenize("How do I reset my password"), ["reset", "password"]);
@@ -41,6 +42,33 @@ test("slugify: mixed CJK + ASCII", () => {
 
 test("slugify: punctuation-only still falls back to 'section'", () => {
   assert.equal(slugify("！？，。"), "section");
+});
+
+test("parseFrontMatter: source_type maps to a priority and is stripped from the body", () => {
+  const { priority, body } = parseFrontMatter("---\nsource_type: policy\n---\n# Title\nBody");
+  assert.equal(priority, 3);
+  assert.equal(body, "# Title\nBody");
+});
+
+test("parseFrontMatter: explicit numeric priority overrides source_type", () => {
+  assert.equal(parseFrontMatter("---\npriority: 2\nsource_type: chat\n---\nx").priority, 2);
+});
+
+test("parseFrontMatter: no front matter → default priority, body unchanged", () => {
+  const { priority, body } = parseFrontMatter("# Title\nBody");
+  assert.equal(priority, DEFAULT_PRIORITY);
+  assert.equal(body, "# Title\nBody");
+});
+
+test("parseMarkdown: sections inherit the file's front-matter priority", () => {
+  const sections = parseMarkdown("policy.md", "---\nsource_type: policy\n---\n# A\nx\n\n# B\ny");
+  assert.equal(sections.length, 2);
+  assert.ok(sections.every((s) => s.priority === 3));
+});
+
+test("parseMarkdown: untagged file → default priority", () => {
+  const sections = parseMarkdown("notes.md", "# A\nx");
+  assert.equal(sections[0].priority, DEFAULT_PRIORITY);
 });
 
 test("parseMarkdown: CJK-headed sections get distinct ids and non-empty tokens", () => {

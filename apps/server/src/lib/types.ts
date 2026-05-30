@@ -14,6 +14,8 @@ export interface Section {
   heading_path: string[];
   content: string;
   tokens: string[];
+  /** Source-authority priority from the file's front matter (see authority.ts). */
+  priority: number;
 }
 
 export interface IndexStats {
@@ -35,6 +37,8 @@ export interface Chunk {
   heading_path: string[];
   content: string;
   label: number;
+  /** Source-authority priority inherited from the parent section's file. */
+  priority: number;
 }
 
 export interface VectorMetadata {

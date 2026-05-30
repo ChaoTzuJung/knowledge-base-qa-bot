@@ -3,6 +3,7 @@ import { generateAnswer } from "../llm/answer.js";
 import { buildPrompt, sectionsToContext } from "../llm/prompts.js";
 import { BM25_THRESHOLD, search as bm25Search } from "./markdown-kb/bm25.js";
 import { isIndexed as isMarkdownIndexed, state as markdownState } from "./markdown-kb/indexer.js";
+import { selectSections } from "./llm-index/router.js";
 import { reciprocalRankFusion } from "./rrf.js";
 import { isVectorIndexed, vectorState } from "./vector-rag/indexer.js";
 import { SIMILARITY_THRESHOLD, vectorSearch } from "./vector-rag/retriever.js";
@@ -44,6 +45,26 @@ export async function retrieve(
       ok: true,
       prompt: buildPrompt(query, ctx),
       sources: toSources(items, scores),
+      notIndexed: false,
+    };
+  }
+
+  if (strategy === "llm_index") {
+    if (!isMarkdownIndexed()) return { ok: false, sources: [], notIndexed: true };
+
+    // The LLM reads the section catalog (what wiki/index.md renders) and picks
+    // the relevant sections by meaning — no keyword/vector scoring.
+    const selected = await selectSections(query, markdownState.sections);
+    if (selected.length === 0) return { ok: false, sources: [], notIndexed: false };
+
+    // No numeric retrieval score here; surface a rank-derived score (best first)
+    // so the sources panel stays meaningful.
+    const scores = selected.map((_, i) => (selected.length - i) / selected.length);
+    const ctx = sectionsToContext(selected, scores);
+    return {
+      ok: true,
+      prompt: buildPrompt(query, ctx),
+      sources: toSources(selected, scores),
       notIndexed: false,
     };
   }
@@ -110,7 +131,11 @@ export async function answerQuery(
   const r = await retrieve(query, strategy);
   if (r.notIndexed) {
     const which =
-      strategy === "markdown_kb" ? "Markdown KB" : strategy === "vector_rag" ? "Vector" : "Hybrid";
+      strategy === "markdown_kb" || strategy === "llm_index"
+        ? "Markdown KB"
+        : strategy === "vector_rag"
+          ? "Vector"
+          : "Hybrid";
     return {
       answer: `The ${which} index has not been built yet. Call POST /index first.`,
       sources: [],

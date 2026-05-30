@@ -24,7 +24,7 @@ npm run dev:web      # 終端 2 —— Vite 啟動於 :5173（反向代理至 :8
 
 ## 功能特色
 
-- **三種檢索策略** —— Markdown KB（BM25）、Vector RAG（HNSW），以及 **Hybrid（預設）**：用 Reciprocal Rank Fusion 融合前兩者；可逐次查詢切換，並有並排 `/compare` 比較（[原因](#為何提供兩種檢索策略)）。
+- **四種檢索策略** —— Markdown KB（BM25）、Vector RAG（HNSW）、**Hybrid（預設）**（用 Reciprocal Rank Fusion 融合前兩者），以及 **LLM Index**（讓模型直接從 wiki 目錄挑段落）；可逐次查詢切換，並有並排 `/compare` 比較（[原因](#為何提供兩種檢索策略)）。
 - **具來源引用的答案**，以 AI SDK v6 [串流協議](#串流協議)逐字串流。
 - **誠實的「我無法確認」**，沒命中時不幻覺（[原因](#為何明確我無法確認)）。
 - **對話記憶**，把追問改寫成獨立完整的查詢（[細節](#對話記憶追問)）。
@@ -286,7 +286,7 @@ curl -s http://localhost:8000/chat/stream -H 'content-type: application/json' -d
 |------|-----------------|--------------------------------------------------------------|----------------------------------------------------------|
 | GET  | `/health`       | —                                                            | `{ "status": "ok" }`                                     |
 | POST | `/build-index`  | —                                                            | `{ files_indexed, sections_indexed, chunks_indexed, … }` |
-| POST | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" }` | `{ answer, sources, strategy }`                     |
+| POST | `/chat`         | `{ query, strategy?: "markdown_kb" \| "vector_rag" \| "hybrid" \| "llm_index" }` | `{ answer, sources, strategy }` |
 | POST | `/chat/stream`  | `{ query, strategy? }` 或 `{ messages: [...], strategy? }`    | AI SDK UI message stream（SSE）                          |
 | POST | `/compare`      | `{ query }`                                                  | `{ markdown_kb: {...}, vector_rag: {...} }`              |
 | POST | `/file-answer`  | `{ query, answer, sources?, strategy? }`                    | `{ filed, slug, file }`                                  |
@@ -378,7 +378,7 @@ Playwright 設定檔的 `webServer` 區塊讓 `npm run test:e2e` 自動啟動 `d
 
 **Hybrid 是預設**，讓你不必逐題二選一：它同時跑兩種檢索，用 Reciprocal Rank Fusion（RRF，K=60）融合兩邊的排名——只要任一邊把某段落排得高就會浮上來，同時拿到 BM25 的關鍵字精準度與向量的同義詞召回。RRF 融合的是**排名**，不是 BM25／cosine 那種彼此不可比的原始分數。它仍維持「至少一種檢索通過自己的信心門檻才回答」，保住「我無法確認」的保證。
 
-### 為何以標題段落為檢索單位？
+**LLM Index** 是第四種、輕檢索的模式：不用 BM25 也不用向量，而是把段落目錄（就是 `wiki/index.md` 呈現的那份對照表）丟給模型，讓它按語意挑出相關的 section id。它不需要向量索引——只要 Markdown 段落——並直接沿用專案本來就會產生的目錄。模型亂編的 id 會被丟掉，若它什麼都沒挑就短路回「我無法確認」。代價是每次查詢多一次 LLM 呼叫，換來不靠 embedding 也能理解意圖的檢索。
 
 Markdown 已具語意邊界 —— 標題。段落足夠小適合 prompt，又足夠大保留局部上下文。向量索引中，超過 1500 字元者再切塊（200 字重疊），避免密集段落於邊界丟失鄰居。
 

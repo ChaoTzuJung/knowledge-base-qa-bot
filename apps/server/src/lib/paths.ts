@@ -17,6 +17,10 @@ export const WIKI_INDEX_PATH = path.join(WIKI_DIR, "index.md");
 export const WIKI_ANSWERS_DIR = path.join(WIKI_DIR, "answers");
 export const WIKI_ANSWERS_INDEX_PATH = path.join(WIKI_ANSWERS_DIR, "index.md");
 
+// User feedback on answers (feeds the eval-case regression loop).
+export const FEEDBACK_DIR = path.join(KB_DIR, "feedback");
+export const FEEDBACK_LOG_PATH = path.join(FEEDBACK_DIR, "feedback.jsonl");
+
 // Dream memory-consolidation loop (self-improving retrieval).
 export const DREAM_DIR = path.join(KB_DIR, "dream");
 export const DREAM_LOG_PATH = path.join(DREAM_DIR, "turns.jsonl");

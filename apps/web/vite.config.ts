@@ -14,6 +14,7 @@ export default defineConfig({
       "/build-index": "http://localhost:8000",
       "/chat": "http://localhost:8000",
       "/compare": "http://localhost:8000",
+      "/feedback": "http://localhost:8000",
     },
   },
 });

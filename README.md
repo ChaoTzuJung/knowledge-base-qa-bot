@@ -38,6 +38,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 - **Grounding verifier** — after answering, a second LLM pass checks each claim against the retrieved sources and flags anything unsupported ([why](#why-explicit-i-cannot-confirm)).
 - **Injection guard & citation safety** — role-hijack / prompt-leak queries are refused before retrieval, and answer citations are validated against the retrieved set (hallucinated ones stripped, missing ones backfilled).
 - **Dream memory consolidation** — a self-improving loop: repeatedly-asked, grounded questions are clustered and distilled into canonical FAQ entries that get promoted into the indexed KB ([details](#dream-memory-consolidation-self-improving-retrieval)).
+- **Feedback → eval loop** — thumbs-down an answer and pick the source it should have used; that miss becomes a permanent answer-eval regression case ([details](#feedback--eval-loop)).
 - **End-to-end type safety** (Hono RPC), a [paraphrase eval harness](#paraphrase-eval-retrieval-robustness), and Playwright + unit [tests](#tests).
 
 **Contents:** [How to use](#1--how-to-use) · [Advanced usage](#2--advanced-usage) · [How it works](#3--how-it-works) · [Design decisions](#4--design-decisions)
@@ -118,6 +119,7 @@ npm run import:raw   # normalize raw/*.txt|*.html into docs/*.md
 npm run generate:wiki # regenerate wiki/index.md from .kb/index.json
 npm run eval         # paraphrase retrieval eval (BM25 vs vector)
 npm run eval:answer  # answer-level eval: citations, decision, grounding (needs OPENAI_API_KEY)
+npm run eval:from-feedback # turn 👎 feedback into regression eval cases
 npm run build        # tsc -b + vite build
 npm run test:unit    # node:test unit tests (raw→Markdown helpers)
 npm run test:e2e     # Playwright suite (auto-starts both dev servers)
@@ -258,6 +260,24 @@ Summary
 It needs `OPENAI_API_KEY` (every case runs `answerQuery`). Cases live in
 [`apps/server/src/eval/cases.ts`](apps/server/src/eval/cases.ts); the metric math is pure and
 unit-tested in [`metrics.test.ts`](apps/server/src/eval/metrics.test.ts).
+
+### Feedback → eval loop
+
+Closes the production→regression loop: rate an answer in the UI, and a thumbs-down becomes a
+new eval case. The sidebar **feedback panel** shows 👍 / 👎 for the latest answer; 👎 reveals a
+picker of the retrieved sources (plus "None — it should have refused") so you record *which
+source the answer should have used*. `POST /feedback` appends the rating to
+`.kb/feedback/feedback.jsonl`.
+
+```bash
+npm run eval:from-feedback   # read the feedback log → write eval/cases.gen.json
+```
+
+`eval:from-feedback` turns each 👎 into a regression case (`expected_source` → an "answer" case
+expecting that section; "should have refused" → a `cannot_confirm` case), deduped by query.
+`npm run eval:answer` loads `cases.gen.json` alongside the curated cases, so a real miss is
+scored on every future run. The committed corpus starts empty; the feedback log stays local to
+`.kb/`.
 
 ### Conversation memory (follow-up questions)
 

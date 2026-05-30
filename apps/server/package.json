@@ -14,6 +14,7 @@
     "generate:wiki": "tsx src/scripts/generate-wiki.ts",
     "dream": "tsx src/scripts/run-dream.ts",
     "eval": "tsx src/eval/paraphrase.ts",
+    "eval:answer": "tsx src/eval/answer-eval.ts",
     "test": "tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {

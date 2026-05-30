@@ -5,6 +5,7 @@ import { StrategyPicker } from "@/components/StrategyPicker";
 import { IndexButton } from "@/components/IndexButton";
 import { SourcesPanel } from "@/components/SourcesPanel";
 import { InterpretedQuery } from "@/components/InterpretedQuery";
+import { GroundingBadge } from "@/components/GroundingBadge";
 import { CompareView } from "@/components/CompareView";
 import { useKbRuntime } from "@/runtime";
 import type { Strategy } from "@kb/shared";
@@ -53,6 +54,7 @@ export default function App() {
               <IndexButton />
               <StrategyPicker value={strategy} onChange={setStrategy} />
               <InterpretedQuery />
+              <GroundingBadge />
               <SourcesPanel />
             </aside>
           </div>

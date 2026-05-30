@@ -2,6 +2,7 @@ export type {
   Strategy,
   SourceInfo,
   ChatResult,
+  GroundingVerdict,
   IndexResult,
   SourcesPayload,
 } from "@kb/shared";

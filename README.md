@@ -34,6 +34,7 @@ Then open <http://localhost:5173>. On first load the indexes are empty — click
 - **Conversation memory** that rewrites follow-ups into standalone queries ([details](#conversation-memory-follow-up-questions)).
 - **Persist & browse** — [file reviewed answers](#answer-filing-persist-reviewed-qa) back into the KB and generate a [browsable wiki index](#wiki-index-browsable-topic-list).
 - **Incremental indexing** — `/build-index` re-embeds only the files whose content changed (per-file SHA-256), reusing the existing vectors for the rest.
+- **Grounding verifier** — after answering, a second LLM pass checks each claim against the retrieved sources and flags anything unsupported ([why](#why-explicit-i-cannot-confirm)).
 - **End-to-end type safety** (Hono RPC), a [paraphrase eval harness](#paraphrase-eval-retrieval-robustness), and Playwright + unit [tests](#tests).
 
 **Contents:** [How to use](#1--how-to-use) · [Advanced usage](#2--advanced-usage) · [How it works](#3--how-it-works) · [Design decisions](#4--design-decisions)
@@ -451,6 +452,15 @@ The whole point of a knowledge base bot is to *not* hallucinate. Below the
 similarity threshold, the server short-circuits to a fixed string without ever
 calling the LLM. That keeps cost predictable and removes the temptation for the
 model to bridge with general knowledge it picked up at training time.
+
+Threshold gating only controls *what's retrieved* — it can't catch a model that
+embellishes beyond the retrieved text. So there's a second layer: after the
+answer is generated, a **grounding verifier** (a separate structured LLM call)
+decomposes it into atomic claims and checks each against the retrieved context,
+returning `{ grounded, unsupported[] }`. On `/chat/stream` the verdict streams as
+a trailing `data-grounding` part (the answer streams in real time, then the badge
+appears); `/chat` returns it inline. It fails open — a flaky checker never
+suppresses a valid answer — so it surfaces unsupported claims rather than blocking.
 
 ### Why stream sources *before* tokens?
 

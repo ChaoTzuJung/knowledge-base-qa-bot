@@ -1,7 +1,8 @@
 # Plan: Multi-metric Eval + Feedback→Test Loop
 
-> Status: drafted, NOT started. The last of the peer-learned features (source: gary9630).
-> Recommend shipping as two PRs — ④a (server-only, low-risk) and ④b (web UI + e2e).
+> Status: ④a (answer-level eval) IMPLEMENTED in this PR. ④b (feedback→test loop, web UI)
+> NOT started. Last of the peer-learned features (source: gary9630). Shipped as two PRs —
+> ④a server-only here; ④b (web UI + e2e) separately.
 
 ## Context
 
